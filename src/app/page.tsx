@@ -1,203 +1,340 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Sparkles, Image as ImageIcon, Lock, Sliders, Download, Layers, ShieldCheck } from 'lucide-react'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Sparkles,
+  ArrowUp,
+  Image as ImageIcon,
+  PenTool,
+  Globe,
+  Paperclip,
+  Wand2,
+  Cpu
+} from "lucide-react";
+import { saveGeneration } from "@/lib/supabase/db";
+
+const QUICK_PROMPTS = [
+  {
+    icon: ImageIcon,
+    label: "Create an image or sticker",
+    prompt: "high quality vector sticker of a cute cybernetic red panda astronaut, holographic outline, vibrant colors",
+  },
+  {
+    icon: Sparkles,
+    label: "Surreal cosmic monolith landscape",
+    prompt: "surreal cosmic landscape, glowing iridescent nebula clouds, glowing geometric obsidian monolith centered, reflections on dark water",
+  },
+  {
+    icon: PenTool,
+    label: "Cyberpunk samurai neon warrior",
+    prompt: "cyberpunk warrior dark armor glowing neon eyes futuristic tokyo city night rain reflections 8k",
+  },
+  {
+    icon: Globe,
+    label: "Ghibli anime cottage on green hills",
+    prompt: "storybook countryside cottage rolling green hills fluffy summer clouds studio ghibli anime aesthetic watercolor",
+  },
+];
+
+const ENGINES = [
+  { id: "flux", label: "Flux Schnell" },
+  { id: "turbo", label: "SDXL Turbo" },
+  { id: "sdxl", label: "Stable XL" },
+];
 
 export default function HomePage() {
-  const [prompt, setPrompt] = useState('')
-  const [batchCount, setBatchCount] = useState(1)
-  const [isSeedLocked, setIsSeedLocked] = useState(false)
-  const [aspectRatio, setAspectRatio] = useState('1:1')
-  const [resolution, setResolution] = useState('2K')
+  const router = useRouter();
+  const [prompt, setPrompt] = useState("");
+  const [engine, setEngine] = useState(ENGINES[0]);
+  const [engineMenuOpen, setEngineMenuOpen] = useState(false);
+  const [autoEnhance, setAutoEnhance] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(selectedPrompt?: string) {
+    const textToUse = selectedPrompt || prompt;
+    if (!textToUse.trim() || submitting) return;
+
+    setSubmitting(true);
+    // Seamlessly transition to Studio with prompt query parameter
+    router.push(`/studio?prompt=${encodeURIComponent(textToUse.trim())}&engine=${engine.id}&autoGen=true`);
+  }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-[#F1F5F9] font-sans">
-      {/* Header */}
-      <header className="border-b border-[#1E293B] bg-[#151D2F]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00F2FE] to-[#4FACFE] flex items-center justify-center font-bold text-black shadow-lg shadow-[#00F2FE]/20">
-              C
-            </div>
-            <span className="font-bold text-xl tracking-tight text-white">
-              CraftAI <span className="text-[#00F2FE]">Studio</span>
-            </span>
-          </div>
-          <nav className="flex items-center gap-6 text-sm font-medium text-gray-300">
-            <a href="#explore" className="text-[#00F2FE] hover:text-white transition">Explore Feed</a>
-            <a href="#studio" className="hover:text-white transition">Creation Studio</a>
-            <a href="#library" className="hover:text-white transition">Cloud Library</a>
-            <div className="px-3 py-1.5 rounded-full bg-[#1E293B] border border-[#334155] text-xs font-semibold text-[#00F2FE] flex items-center gap-1.5">
-              <span>✦ 120 Credits</span>
-            </div>
-          </nav>
-        </div>
-      </header>
+    <div
+      style={{
+        minHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px) 60px",
+        position: "relative",
+      }}
+    >
+      {/* Background radial glow */}
+      <div
+        style={{
+          position: "absolute",
+          top: "30%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "min(600px, 90vw)",
+          height: "350px",
+          background: "radial-gradient(ellipse, rgba(0, 212, 255, 0.05) 0%, rgba(99, 102, 241, 0.03) 50%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        {/* Hero Section */}
-        <section className="text-center py-12 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00F2FE]/10 border border-[#00F2FE]/30 text-xs font-semibold text-[#00F2FE] mb-6">
-            <Sparkles className="w-3.5 h-3.5" /> Next-Gen AI Studio & Creator Economy
-          </div>
-          <h1 className="text-5xl font-extrabold tracking-tight mb-4 text-white">
-            Create, Remix & Earn with <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F2FE] to-[#4FACFE]">CraftAI</span>
-          </h1>
-          <p className="text-gray-400 text-lg">
-            Free in-app studio creation with Pay-to-Download 4K gating, Consistent Character face locking, and encrypted prompt DRM royalties.
-          </p>
-        </section>
+      {/* Center Main Content */}
+      <div style={{ width: "100%", maxWidth: "720px", textAlign: "center", position: "relative", zIndex: 1 }}>
+        {/* Headline matching ChatGPT style */}
+        <h1
+          style={{
+            fontSize: "clamp(22px, 4.5vw, 36px)",
+            fontWeight: 700,
+            color: "#ffffff",
+            letterSpacing: "-0.02em",
+            marginBottom: "clamp(20px, 3vw, 32px)",
+            fontFamily: "var(--font-outfit, Outfit, sans-serif)",
+          }}
+        >
+          What would you like to create today?
+        </h1>
 
-        {/* Studio Interactive Card */}
-        <section id="studio" className="bg-[#151D2F] border border-[#1E293B] rounded-2xl p-8 shadow-2xl mb-16">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-[#00F2FE]" /> Generation Studio Bar
-            </h2>
-            <div className="flex items-center gap-4 text-sm">
-              <span className="text-gray-400">Model: <strong className="text-white">Flux.1 Schnell / SDXL</strong></span>
-            </div>
-          </div>
-
-          {/* Prompt Input Box with Actions */}
-          <div className="relative mb-6">
+        {/* Central Input Pill Bar */}
+        <div
+          style={{
+            width: "100%",
+            background: "#161d2b",
+            border: "1px solid #222f4c",
+            borderRadius: "20px",
+            padding: "12px 14px 10px",
+            boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.08)",
+            transition: "border-color 0.2s, box-shadow 0.2s",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+          {/* Text input row */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
             <textarea
-              rows={3}
+              id="home-prompt-input"
+              rows={2}
               value={prompt}
+              disabled={submitting}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your scene or concept... (e.g. samurai girl in neon cyber city, volumetric rim light)"
-              className="w-full bg-[#0B0F19] border border-[#1E293B] focus:border-[#00F2FE] rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none transition resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              placeholder={submitting ? "Opening studio and generating artwork..." : "Ask anything or describe the artwork you want to create..."}
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: submitting ? "#64748b" : "#f1f5f9",
+                fontSize: "14px",
+                lineHeight: "1.5",
+                resize: "none",
+                fontFamily: "var(--font-inter, Inter, sans-serif)",
+                padding: "4px 0",
+                cursor: submitting ? "not-allowed" : "text",
+              }}
             />
-            <div className="absolute right-3 bottom-3 flex items-center gap-2">
-              <button className="px-3 py-1.5 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-xs font-semibold text-[#00F2FE] flex items-center gap-1.5 transition">
-                <Sparkles className="w-3.5 h-3.5" /> Enhance (Magic Expander)
-              </button>
-              <button className="px-3 py-1.5 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-xs font-semibold text-purple-400 flex items-center gap-1.5 transition">
-                <ShieldCheck className="w-3.5 h-3.5" /> ✨ AI Edit (Subject Lock)
-              </button>
-            </div>
           </div>
 
-          {/* Studio Controls Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-[#1E293B] text-sm">
-            {/* Batch Count */}
-            <div>
-              <label className="block text-gray-400 text-xs mb-2">Batch Count</label>
-              <div className="flex items-center gap-3">
-                {[1, 2, 3, 4].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setBatchCount(n)}
-                    className={`w-9 h-9 rounded-lg font-bold transition ${batchCount === n ? 'bg-[#00F2FE] text-black' : 'bg-[#0B0F19] border border-[#1E293B] text-gray-300 hover:border-gray-500'}`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Bottom control pills row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "4px", flexWrap: "wrap", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {/* Engine Selector Dropdown */}
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  onClick={() => setEngineMenuOpen(!engineMenuOpen)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 12px",
+                    borderRadius: "9999px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid #1e2533",
+                    color: "#cbd5e1",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff"}
+                  onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533"}
+                >
+                  <Cpu size={13} style={{ color: "#00d4ff" }} />
+                  <span>{engine.label}</span>
+                </button>
 
-            {/* Seed Lock */}
-            <div>
-              <label className="block text-gray-400 text-xs mb-2">Seed Lock</label>
+                {engineMenuOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "calc(100% + 8px)",
+                      left: 0,
+                      background: "#161d2b",
+                      border: "1px solid #222f4c",
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      zIndex: 100,
+                      boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+                      minWidth: "150px",
+                    }}
+                  >
+                    {ENGINES.map((e) => (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => {
+                          setEngine(e);
+                          setEngineMenuOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "8px 14px",
+                          background: engine.id === e.id ? "rgba(0, 212, 255, 0.1)" : "transparent",
+                          color: engine.id === e.id ? "#00d4ff" : "#cbd5e1",
+                          border: "none",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Auto-Enhance Toggle Pill */}
               <button
-                onClick={() => setIsSeedLocked(!isSeedLocked)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium transition ${isSeedLocked ? 'bg-[#00F2FE]/10 border-[#00F2FE] text-[#00F2FE]' : 'bg-[#0B0F19] border-[#1E293B] text-gray-400'}`}
+                type="button"
+                onClick={() => setAutoEnhance(!autoEnhance)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "9999px",
+                  background: autoEnhance ? "rgba(99, 102, 241, 0.15)" : "transparent",
+                  border: autoEnhance ? "1px solid rgba(99, 102, 241, 0.35)" : "1px solid #1e2533",
+                  color: autoEnhance ? "#818cf8" : "#64748b",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
               >
-                <Lock className="w-4 h-4" />
-                {isSeedLocked ? 'Seed Locked (🔒)' : 'Random Seed'}
+                <Wand2 size={13} />
+                <span>Auto-Enhance {autoEnhance ? "On" : "Off"}</span>
               </button>
             </div>
 
-            {/* Aspect Ratio */}
-            <div>
-              <label className="block text-gray-400 text-xs mb-2">Aspect Ratio</label>
-              <select
-                value={aspectRatio}
-                onChange={(e) => setAspectRatio(e.target.value)}
-                className="w-full bg-[#0B0F19] border border-[#1E293B] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00F2FE]"
-              >
-                <option value="Auto">Auto (Detect)</option>
-                <option value="1:1">1:1 Square</option>
-                <option value="9:16">9:16 Story/Reel</option>
-                <option value="16:9">16:9 Widescreen</option>
-                <option value="4:5">4:5 Portrait</option>
-              </select>
-            </div>
-
-            {/* Resolution */}
-            <div>
-              <label className="block text-gray-400 text-xs mb-2">Resolution</label>
-              <div className="flex items-center gap-2">
-                {['HD', '2K', '4K'].map((res) => (
-                  <button
-                    key={res}
-                    onClick={() => setResolution(res)}
-                    className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${resolution === res ? 'bg-[#4FACFE] text-black' : 'bg-[#0B0F19] border border-[#1E293B] text-gray-400 hover:border-gray-500'}`}
-                  >
-                    {res}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <div className="mt-8 flex justify-end">
-            <button className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#00F2FE] to-[#4FACFE] text-black font-bold text-base shadow-lg shadow-[#00F2FE]/25 hover:opacity-95 transition flex items-center gap-2">
-              <Sparkles className="w-5 h-5" /> Generate ✨ {batchCount * 2} Credits
+            {/* Submit Arrow Button */}
+            <button
+              id="home-submit-btn"
+              type="button"
+              onClick={() => handleSubmit()}
+              disabled={!prompt.trim() || submitting}
+              style={{
+                width: "34px",
+                height: "34px",
+                borderRadius: "50%",
+                background: prompt.trim() && !submitting ? "#00d4ff" : "#1e2533",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: prompt.trim() && !submitting ? "pointer" : "not-allowed",
+                color: prompt.trim() && !submitting ? "#000000" : "#64748b",
+                transition: "all 0.15s",
+                boxShadow: prompt.trim() && !submitting ? "0 0 16px rgba(0, 212, 255, 0.4)" : "none",
+              }}
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
             </button>
           </div>
-        </section>
+        </div>
 
-        {/* Explore Feed Masonry Preview */}
-        <section id="explore" className="mb-16">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-white">Explore & Prompt Marketplace</h2>
-              <p className="text-gray-400 text-sm">Remix trending prompts with 1-tap dual actions</p>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-3 py-1.5 rounded-full bg-[#1E293B] text-gray-300 font-medium">All</span>
-              <span className="px-3 py-1.5 rounded-full bg-[#0B0F19] text-gray-400 hover:text-white transition cursor-pointer">Anime</span>
-              <span className="px-3 py-1.5 rounded-full bg-[#0B0F19] text-gray-400 hover:text-white transition cursor-pointer">Cyberpunk</span>
-              <span className="px-3 py-1.5 rounded-full bg-[#0B0F19] text-gray-400 hover:text-white transition cursor-pointer">Photorealism</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { title: "Neon Cyber Samurai", author: "@neo_artist", tag: "Cyberpunk", cut: "40% Royalty" },
-              { title: "Ethereal Portrait 8K", author: "@studio_master", tag: "Photorealism", cut: "40% Royalty" },
-              { title: "Futuristic Hypercar", author: "@mecha_labs", tag: "3D Render", cut: "30% Royalty" }
-            ].map((card, i) => (
-              <div key={i} className="bg-[#151D2F] border border-[#1E293B] rounded-2xl overflow-hidden hover:border-[#00F2FE]/50 transition group">
-                <div className="h-64 bg-[#0B0F19] flex items-center justify-center text-gray-600 relative overflow-hidden">
-                  <ImageIcon className="w-12 h-12 opacity-30" />
-                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md text-[11px] font-semibold text-[#00F2FE]">
-                    {card.tag}
-                  </div>
+        {/* Quick Action Prompt Chips (Matching ChatGPT Screenshot) */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))",
+            gap: "10px",
+            marginTop: "24px",
+          }}
+        >
+          {QUICK_PROMPTS.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={idx}
+                id={`chip-${idx}`}
+                type="button"
+                onClick={() => {
+                  setPrompt(item.prompt);
+                  handleSubmit(item.prompt);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px 16px",
+                  borderRadius: "14px",
+                  background: "#111827",
+                  border: "1px solid #1e2533",
+                  color: "#cbd5e1",
+                  fontSize: "13px",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
+                  (e.currentTarget as HTMLButtonElement).style.background = "#161d2b";
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
+                  (e.currentTarget as HTMLButtonElement).style.background = "#111827";
+                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "8px",
+                    background: "rgba(0, 212, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon size={14} style={{ color: "#00d4ff" }} />
                 </div>
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-white group-hover:text-[#00F2FE] transition">{card.title}</h3>
-                    <span className="text-xs text-green-400 font-semibold">{card.cut}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-4">By {card.author} • AES-256 Protected Recipe</p>
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#1E293B]">
-                    <button className="py-2 px-3 rounded-lg bg-[#00F2FE]/10 border border-[#00F2FE]/30 text-[#00F2FE] hover:bg-[#00F2FE]/20 text-xs font-semibold transition">
-                      Use as Prompt
-                    </button>
-                    <button className="py-2 px-3 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-gray-300 text-xs font-semibold transition">
-                      Use as Ref
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
+                <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
-  )
+  );
 }
