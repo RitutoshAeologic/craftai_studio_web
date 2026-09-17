@@ -295,6 +295,10 @@ export interface ChatDeltaParams {
   user_instruction: string;
   turn_count?: number;
   ai_model?: string;
+  /** Stable UUID identifying the copilot session.
+   *  Maps to backend PromptDeltaRequest.session_id (required field).
+   *  If omitted, a one-off UUID is generated per-call as fallback. */
+  session_id?: string;
 }
 
 export interface ChatDeltaResponse {
@@ -322,6 +326,10 @@ export async function compileChatDelta(
           ...authHeader,
         },
         body: JSON.stringify({
+          // session_id is required by backend PromptDeltaRequest schema.
+          // Callers should pass a stable UUID per Studio session so the backend
+          // can track conversational context across turns.
+          session_id: params.session_id ?? crypto.randomUUID(),
           base_prompt: params.base_prompt,
           user_instruction: params.user_instruction,
           turn_count: params.turn_count ?? 1,
@@ -461,6 +469,84 @@ export async function uploadReferencePhoto(
     };
     reader.readAsDataURL(file);
   });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   7. Multi-LLM Configurable Gateway
+   GET /api/v1/prompt-engineering/config
+   Returns the active LLM configuration from Supabase app_settings
+   with 60-second TTL (matches backend ConfigService cache window).
+───────────────────────────────────────────────────────────── */
+export interface LLMConfig {
+  active_provider: string;
+  fallback_order: string[];
+  available_providers: string[];
+  model_mappings: Record<string, string>;
+}
+
+const LLM_CONFIG_DEFAULTS: LLMConfig = {
+  active_provider: "gemini",
+  fallback_order: ["gemini", "groq", "local"],
+  available_providers: ["gemini", "groq", "openai", "claude", "local"],
+  model_mappings: {
+    gemini: "gemini-2.5-flash",
+    groq: "qwen/qwen3.8-27b",
+    openai: "gpt-4o-mini",
+    claude: "claude-3-5-sonnet-20241022",
+    local: "offline-cinematic-engine",
+  },
+};
+
+// In-memory cache mirroring the 60-second backend ConfigService TTL
+let _llmConfigCache: LLMConfig | null = null;
+let _llmConfigLastFetch = 0;
+const LLM_CONFIG_CACHE_TTL_MS = 60_000;
+
+/**
+ * Fetches the active LLM configuration from the backend.
+ * Results are cached for 60 seconds to mirror the backend ConfigService TTL.
+ * Falls back to sensible defaults when the backend is unreachable.
+ */
+export async function getLLMConfig(): Promise<LLMConfig> {
+  const now = Date.now();
+  if (_llmConfigCache && now - _llmConfigLastFetch < LLM_CONFIG_CACHE_TTL_MS) {
+    return _llmConfigCache;
+  }
+
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/prompt-engineering/config`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+      }
+    );
+
+    if (res.ok) {
+      const data = (await res.json()) as LLMConfig;
+      _llmConfigCache = data;
+      _llmConfigLastFetch = now;
+      return data;
+    }
+
+    const err = await parseErrorResponse(res);
+    console.warn("[getLLMConfig] Backend returned error:", err);
+  } catch (err) {
+    console.warn("[getLLMConfig] Backend unreachable, using defaults:", err);
+  }
+
+  // On failure, return defaults (do NOT cache so it retries on next call)
+  return LLM_CONFIG_DEFAULTS;
+}
+
+/** Forces the LLM config cache to expire so the next call re-fetches from the backend. */
+export function invalidateLLMConfigCache(): void {
+  _llmConfigCache = null;
+  _llmConfigLastFetch = 0;
 }
 
 export async function cleanupReferencePhoto(url: string): Promise<void> {

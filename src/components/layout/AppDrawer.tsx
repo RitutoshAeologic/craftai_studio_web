@@ -62,7 +62,6 @@ export default function AppDrawer() {
   }, [userKey]);
 
   const navItems = [
-    { href: "/studio", label: "AI Creation Studio", icon: Sparkles },
     { href: "/explore", label: "Explore Community", icon: LayoutGrid },
     { href: "/library", label: "Cloud Library", icon: FolderHeart },
     { href: "/tools", label: "Creative Tools", icon: Sliders },

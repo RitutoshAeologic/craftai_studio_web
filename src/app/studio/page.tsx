@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/backend-client";
 import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
+import { useLLMConfig } from "@/context/LLMConfigContext";
 
 /* ── Types & Constants ──────────────────────────────────────── */
 type Model = { id: ImageModel; label: string; version: string };
@@ -44,10 +45,14 @@ const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> 
   "4:5": { width: 896, height: 1120 },
 };
 
-const LLM_ENGINES = [
+// LLM_ENGINES is now derived dynamically from the backend config (see StudioContent).
+// Fallback list used only when the backend is unreachable.
+const FALLBACK_LLM_ENGINES = [
   { id: "gemini", label: "Gemini 2.5 Flash (Live AI)" },
   { id: "groq",   label: "Groq Llama 3.3 (Fast)" },
+  { id: "openai", label: "GPT-4o Mini" },
   { id: "claude", label: "Claude 3.5 Sonnet (Pro)" },
+  { id: "local",  label: "Local (Offline Engine)" },
 ];
 
 const STYLE_BOOSTERS = [
@@ -107,6 +112,8 @@ interface StudioChatMessage {
 function StudioContent() {
   const router = useRouter();
   const { profile, user } = useUser();
+  // ── Multi-LLM Config from Supabase (via backend ConfigService) ──────────
+  const { llmConfig, isLoadingConfig } = useLLMConfig();
   const userKey = user?.id || profile.email || "default";
   const searchParams = useSearchParams();
 
@@ -121,6 +128,15 @@ function StudioContent() {
 
   const activeSessionId = useRef<string | null>(querySessionId);
   const remixedFromPromptId = useRef<string | null>(queryRemixId);
+
+  // Stable UUID identifying this copilot conversation session.
+  // Required by backend PromptDeltaRequest.session_id (Field(...) — not nullable).
+  // Generated once per component mount; persists for the lifetime of the Studio session.
+  const copilotSessionId = useRef<string>(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : `session_${Date.now()}`
+  );
+  // Tracks how many delta turns have occurred in this session (max 5 per backend rule)
+  const copilotTurnCount = useRef<number>(0);
 
   useEffect(() => {
     if (querySessionId) activeSessionId.current = querySessionId;
@@ -169,7 +185,31 @@ function StudioContent() {
     }
     return MODELS[0];
   });
+
+  // selectedEngine is initialized from the backend's active_provider.
+  // Once llmConfig loads, it stays in sync via the useEffect below.
   const [selectedEngine, setSelectedEngine] = useState<string>("gemini");
+
+  // Sync selectedEngine whenever the backend config resolves or changes
+  useEffect(() => {
+    if (!isLoadingConfig && llmConfig.active_provider) {
+      setSelectedEngine(llmConfig.active_provider);
+    }
+  }, [llmConfig.active_provider, isLoadingConfig]);
+
+  // Build the engine list from available_providers + model_mappings
+  const llmEngines = (llmConfig.available_providers.length > 0
+    ? llmConfig.available_providers
+    : ["gemini", "groq", "local"]
+  ).map((provider) => {
+    const fallback = FALLBACK_LLM_ENGINES.find((e) => e.id === provider);
+    const modelName = llmConfig.model_mappings[provider] || provider;
+    return {
+      id: provider,
+      label: fallback?.label ?? `${provider.charAt(0).toUpperCase() + provider.slice(1)} (${modelName})`,
+    };
+  });
+
   const [ratio, setRatio] = useState<Ratio>(RATIOS[0]);
 
   // Generation & Progress states
@@ -296,13 +336,15 @@ function StudioContent() {
     }
   }, [queryPrompt, autoGen]);
 
-  /* ── 1. Magic Enhance (Prompt Expansion via Gemini Flash) ─── */
+  /* ── 1. Magic Enhance (Prompt Expansion via active LLM provider) ─── */
   async function handleEnhance() {
     const raw = promptRecipe.trim();
     if (!raw || isBusy) return;
 
     setIsEnhancing(true);
     try {
+      // Use selectedEngine (which defaults to backend's active_provider) so
+      // the backend honours the Supabase LLM config with its fallback cascade.
       const res = await expandPrompt({
         raw_prompt: raw,
         aspect_ratio: ratio.id,
@@ -317,7 +359,7 @@ function StudioContent() {
           {
             id: `enhance-${Date.now()}`,
             role: "assistant",
-            content: `✨ Master formula armed with ${res.model_used || "Gemini 2.5 Flash"}. Your clean prompt is ready for high-fidelity FLUX dispatch.`,
+            content: `✨ Master formula armed with ${res.model_used || llmConfig.model_mappings[selectedEngine] || selectedEngine}. Your clean prompt is ready for high-fidelity FLUX dispatch.`,
             timestamp: "Just now",
             status: "completed",
           },
@@ -358,11 +400,18 @@ function StudioContent() {
 
     try {
       const baseToUse = lastGeneratedPrompt || promptRecipe;
+      // Increment turn counter (backend enforces max 5 turns per session)
+      copilotTurnCount.current = Math.min(copilotTurnCount.current + 1, 5);
+
       const res = await compileChatDelta({
         base_prompt: baseToUse,
         user_instruction: cleanInstruction,
-        turn_count: 1,
-        ai_model: "groq",
+        // Pass stable session UUID — fixes 422 Unprocessable Entity from backend
+        // (PromptDeltaRequest.session_id is a required Field on the backend schema)
+        session_id: copilotSessionId.current,
+        turn_count: copilotTurnCount.current,
+        // Use active backend provider for delta compilation (respects Supabase config)
+        ai_model: selectedEngine || llmConfig.active_provider || "groq",
       });
 
       if (res?.compiled_prompt) {
@@ -1215,7 +1264,7 @@ function StudioContent() {
                   borderRadius: "8px", padding: "4px", zIndex: 100, minWidth: "180px",
                   boxShadow: "0 8px 24px rgba(0,0,0,0.8)",
                 }}>
-                  {LLM_ENGINES.map((eng) => (
+                  {llmEngines.map((eng) => (
                     <button
                       key={eng.id}
                       onClick={() => { setSelectedEngine(eng.id); setEngineOpen(false); }}
@@ -1224,9 +1273,13 @@ function StudioContent() {
                         background: selectedEngine === eng.id ? "rgba(99,102,241,0.2)" : "transparent",
                         border: "none", color: selectedEngine === eng.id ? S.cyan : S.textPrimary,
                         fontSize: "11px", textAlign: "left", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
                       }}
                     >
-                      {eng.label}
+                      <span>{eng.label}</span>
+                      {eng.id === llmConfig.active_provider && (
+                        <span style={{ fontSize: "9px", color: S.success, fontWeight: 700 }}>ACTIVE</span>
+                      )}
                     </button>
                   ))}
                 </div>
