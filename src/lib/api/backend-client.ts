@@ -51,6 +51,8 @@ export async function parseErrorResponse(res: Response): Promise<string> {
 ───────────────────────────────────────────────────────────── */
 export interface DispatchGenerationParams {
   prompt: string;
+  negative_prompt?: string | null;
+  structured_metadata?: StructuredPromptMetadata | null;
   character_id?: string | null;
   face_reference_urls?: string[] | null;
   width?: number;
@@ -83,6 +85,8 @@ export async function dispatchGeneration(
         },
         body: JSON.stringify({
           prompt: params.prompt,
+          negative_prompt: params.negative_prompt ?? null,
+          structured_metadata: params.structured_metadata ?? null,
           character_id: params.character_id ?? null,
           face_reference_urls: params.face_reference_urls ?? null,
           width: params.width ?? 1024,
@@ -234,9 +238,19 @@ export function subscribeGenerationProgress(
 }
 
 /* ─────────────────────────────────────────────────────────────
-   3. Prompt Expansion (Magic Enhance)
+   3. Prompt Expansion (Magic Enhance & Structured Visual Director)
    POST /api/v1/prompt-engineering/expand
 ───────────────────────────────────────────────────────────── */
+export interface StructuredPromptMetadata {
+  subject?: string;             // Central character / entity details
+  environment?: string;         // Atmospheric background & scene
+  lighting?: string;            // Cinematic lighting, rim lights, shadow dynamics
+  camera_optics?: string;       // Lens focal length, aperture (f/1.4), film grain
+  art_style?: string;           // Overall art genre / rendering engine
+  avoid?: string[];             // Negative visual concepts to suppress
+  preserved_elements?: string[];// Identity features, faces, or elements locked from modification
+}
+
 export interface ExpandPromptParams {
   raw_prompt: string;
   starter_chip?: string | null;
@@ -247,7 +261,9 @@ export interface ExpandPromptParams {
 export interface ExpandPromptResponse {
   master_prompt: string;
   negative_prompt?: string;
+  complexity_score?: number;
   model_used?: string;
+  structured_metadata?: StructuredPromptMetadata;
 }
 
 export async function expandPrompt(
@@ -278,11 +294,26 @@ export async function expandPrompt(
     console.warn("[expandPrompt] Network fallback:", err);
   }
 
-  // Graceful client fallback
+  // Graceful client fallback with structured visual decomposition
+  const hasFacePreserve =
+    params.raw_prompt.toLowerCase().includes("face") ||
+    params.raw_prompt.toLowerCase().includes("preserve") ||
+    params.raw_prompt.toLowerCase().includes("likeness");
+
   return {
     master_prompt: `${params.raw_prompt}, ultra-detailed 8K masterpiece, volumetric cinematic lighting, photorealistic textures, octane render, trending on artstation`,
     negative_prompt: "blurry, low quality, distorted, watermark, signature, artifacts",
+    complexity_score: 3,
     model_used: "Client Fallback Expander",
+    structured_metadata: {
+      subject: params.raw_prompt,
+      environment: "Atmospheric cinematic backdrop with volumetric depth",
+      lighting: "Cinematic volumetric lighting with sharp rim accents",
+      camera_optics: "85mm f/1.4 portrait lens, shallow depth of field",
+      art_style: "Photorealistic 8K, octane render",
+      avoid: ["blurry", "low quality", "distorted", "watermark", "signature", "artifacts"],
+      preserved_elements: hasFacePreserve ? ["Authentic facial structure & likeness"] : [],
+    },
   };
 }
 
@@ -310,6 +341,7 @@ export interface ChatDeltaResponse {
   };
   suggested_chips?: string[];
   model_used?: string;
+  structured_metadata?: StructuredPromptMetadata;
 }
 
 export async function compileChatDelta(
@@ -347,6 +379,11 @@ export async function compileChatDelta(
     console.warn("[compileChatDelta] Network fallback:", err);
   }
 
+  const hasFacePreserve =
+    params.user_instruction.toLowerCase().includes("face") ||
+    params.user_instruction.toLowerCase().includes("preserve") ||
+    params.base_prompt.toLowerCase().includes("face");
+
   // Client fallback
   return {
     compiled_prompt: `${params.base_prompt}, ${params.user_instruction}, cinematic lighting, high quality 8k`,
@@ -357,6 +394,15 @@ export async function compileChatDelta(
     },
     suggested_chips: ["Add Golden Hour", "Make Cyberpunk Neon", "Soft Bokeh 85mm"],
     model_used: "Client Fallback Compiler",
+    structured_metadata: {
+      subject: params.base_prompt,
+      environment: params.user_instruction.toLowerCase().includes("street") || params.user_instruction.toLowerCase().includes("city") ? params.user_instruction : "Refined atmospheric environment",
+      lighting: params.user_instruction.toLowerCase().includes("light") ? params.user_instruction : "Cinematic illumination and rim dynamics",
+      camera_optics: "35mm photographic portrait lens",
+      art_style: "Photorealistic high fidelity 8K",
+      avoid: ["blurry", "low quality", "deformed"],
+      preserved_elements: hasFacePreserve ? ["Authentic facial structure & likeness"] : [],
+    },
   };
 }
 

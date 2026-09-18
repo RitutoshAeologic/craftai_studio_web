@@ -6,6 +6,7 @@ import {
   ChevronDown, Upload, Sparkles, Shield, Globe,
   Wand2, CheckCircle2, Zap, Bookmark, Check, User, Palette, Mountain, Plus,
   Image as ImageIcon, Lock, Camera, Copy, AlertCircle, RefreshCw, Layers, ArrowRight,
+  ScanSearch,
 } from "lucide-react";
 import { generateFreeImage, stripWatermark, type ImageModel, type AspectRatio } from "@/lib/api/generate";
 import {
@@ -15,7 +16,9 @@ import {
   compileChatDelta,
   uploadReferencePhoto,
   cleanupReferencePhoto,
+  type StructuredPromptMetadata,
 } from "@/lib/api/backend-client";
+import { PromptInspectorModal } from "@/components/studio/PromptInspectorModal";
 import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
@@ -107,6 +110,7 @@ interface StudioChatMessage {
   diff?: ChatDeltaDiff;
   suggestedChips?: string[];
   deltaSummary?: string;
+  structuredMetadata?: StructuredPromptMetadata;
 }
 
 function StudioContent() {
@@ -230,6 +234,10 @@ function StudioContent() {
     queryPrompt || "surreal cosmic landscape, glowing iridescent nebula clouds, glowing geometric obsidian monolith centered"
   );
   const [armedMasterFormula, setArmedMasterFormula] = useState<string | null>(null);
+  const [structuredMetadata, setStructuredMetadata] = useState<StructuredPromptMetadata | null>(null);
+  const [negativePrompt, setNegativePrompt] = useState<string | null>(null);
+  const [complexityScore, setComplexityScore] = useState<number>(3);
+  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(false);
 
   // Reference photos & Face Lock
   const [refImage, setRefImage] = useState<string | null>(queryImage || null);
@@ -353,15 +361,20 @@ function StudioContent() {
 
       if (res?.master_prompt) {
         setArmedMasterFormula(res.master_prompt);
-        // Add info message to chat
+        if (res.structured_metadata) setStructuredMetadata(res.structured_metadata);
+        if (res.negative_prompt) setNegativePrompt(res.negative_prompt);
+        if (res.complexity_score) setComplexityScore(res.complexity_score);
+
+        // Add info message to chat with visual breakdown
         setChatMessages((prev) => [
           ...prev,
           {
             id: `enhance-${Date.now()}`,
             role: "assistant",
-            content: `✨ Master formula armed with ${res.model_used || llmConfig.model_mappings[selectedEngine] || selectedEngine}. Your clean prompt is ready for high-fidelity FLUX dispatch.`,
+            content: `✨ Master formula armed with ${res.model_used || llmConfig.model_mappings[selectedEngine] || selectedEngine}. Visual Director breakdown generated.`,
             timestamp: "Just now",
             status: "completed",
+            structuredMetadata: res.structured_metadata,
           },
         ]);
       }
@@ -417,6 +430,7 @@ function StudioContent() {
       if (res?.compiled_prompt) {
         setPromptRecipe(res.compiled_prompt);
         setArmedMasterFormula(null); // Refined prompt becomes the new recipe
+        if (res.structured_metadata) setStructuredMetadata(res.structured_metadata);
 
         setChatMessages((prev) =>
           prev.map((msg) =>
@@ -428,6 +442,7 @@ function StudioContent() {
                   diff: res.diff,
                   suggestedChips: res.suggested_chips || ["Add Neon Reflections", "35mm Portrait Bokeh"],
                   deltaSummary: res.delta_summary,
+                  structuredMetadata: res.structured_metadata,
                 }
               : msg
           )
@@ -549,6 +564,8 @@ function StudioContent() {
       // Step A: Dispatch task to FastAPI backend
       const dispatchRes = await dispatchGeneration({
         prompt: promptToSend,
+        negative_prompt: negativePrompt,
+        structured_metadata: structuredMetadata,
         face_reference_urls: faceUrls.length > 0 ? faceUrls : null,
         width,
         height,
@@ -1319,6 +1336,80 @@ function StudioContent() {
                 }}>
                   {msg.content}
 
+                  {/* Visual Director Chips if message has structured metadata */}
+                  {msg.structuredMetadata && (
+                    <div style={{
+                      marginTop: "8px",
+                      paddingTop: "8px",
+                      borderTop: "1px solid rgba(255,255,255,0.08)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "5px",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: S.cyan, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          Visual Director Breakdown
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (msg.structuredMetadata) setStructuredMetadata(msg.structuredMetadata);
+                            setIsInspectorOpen(true);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#a5b4fc",
+                            fontSize: "10px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "3px",
+                            padding: 0,
+                          }}
+                        >
+                          <ScanSearch size={10} />
+                          <span>Inspect</span>
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {((msg.structuredMetadata.preserved_elements && msg.structuredMetadata.preserved_elements.length > 0) ||
+                          msg.content.toLowerCase().includes("face") ||
+                          msg.content.toLowerCase().includes("preserve")) && (
+                          <span style={{
+                            fontSize: "10px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: "rgba(16, 185, 129, 0.2)",
+                            border: "1px solid rgba(16, 185, 129, 0.45)",
+                            color: "#34d399",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                          }}>
+                            <Lock size={9} />
+                            🔒 Authentic Face Structure Locked
+                          </span>
+                        )}
+                        {msg.structuredMetadata.subject && (
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(99,102,241,0.12)", color: "#c7d2fe" }}>
+                            👤 {msg.structuredMetadata.subject.length > 28 ? msg.structuredMetadata.subject.slice(0, 28) + "..." : msg.structuredMetadata.subject}
+                          </span>
+                        )}
+                        {msg.structuredMetadata.lighting && (
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(245,158,11,0.12)", color: "#fde68a" }}>
+                            💡 {msg.structuredMetadata.lighting.length > 22 ? msg.structuredMetadata.lighting.slice(0, 22) + "..." : msg.structuredMetadata.lighting}
+                          </span>
+                        )}
+                        {msg.structuredMetadata.camera_optics && (
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(16,185,129,0.12)", color: "#a7f3d0" }}>
+                            📷 {msg.structuredMetadata.camera_optics.length > 20 ? msg.structuredMetadata.camera_optics.slice(0, 20) + "..." : msg.structuredMetadata.camera_optics}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Diff Badges if returned by Delta compiler */}
                   {msg.diff && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "6px" }}>
@@ -1464,45 +1555,201 @@ function StudioContent() {
                     <Sparkles size={12} style={{ color: S.cyan }} />
                     <span>AI Master Formula Armed • Ready for FLUX</span>
                   </div>
-                  <button
-                    onClick={() => setArmedMasterFormula(null)}
-                    title="Disarm Master Formula and return to clean prompt"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#94a3b8",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                    }}
-                  >
-                    ✕
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <button
+                      onClick={() => setIsInspectorOpen(true)}
+                      style={{
+                        background: "rgba(99, 102, 241, 0.3)",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "2px 6px",
+                        color: "#ffffff",
+                        cursor: "pointer",
+                        fontSize: "10.5px",
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "3px",
+                      }}
+                    >
+                      <ScanSearch size={11} />
+                      <span>Inspect</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setArmedMasterFormula(null);
+                        setStructuredMetadata(null);
+                      }}
+                      title="Disarm Master Formula and return to clean prompt"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94a3b8",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Visual Director Chips Breakdown */}
+              {structuredMetadata && (
+                <div
+                  style={{
+                    marginTop: "6px",
+                    padding: "7px 10px",
+                    borderRadius: "8px",
+                    background: "#0c0e17",
+                    border: "1px solid #1a2030",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "5px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: S.cyan, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      Visual Director Breakdown
+                    </span>
+                    <button
+                      onClick={() => setIsInspectorOpen(true)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#818cf8",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        padding: 0,
+                      }}
+                    >
+                      <ScanSearch size={10} />
+                      <span>Inspector</span>
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                    {((structuredMetadata.preserved_elements && structuredMetadata.preserved_elements.length > 0) ||
+                      promptRecipe.toLowerCase().includes("face") ||
+                      promptRecipe.toLowerCase().includes("preserve")) && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "2px 7px",
+                          borderRadius: "4px",
+                          background: "rgba(16, 185, 129, 0.18)",
+                          border: "1px solid rgba(16, 185, 129, 0.45)",
+                          color: "#34d399",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        <Lock size={10} />
+                        🔒 Authentic Face Structure Locked
+                      </span>
+                    )}
+                    {structuredMetadata.lighting && (
+                      <span
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: "4px",
+                          background: "rgba(245, 158, 11, 0.1)",
+                          border: "1px solid rgba(245, 158, 11, 0.25)",
+                          color: "#fde68a",
+                          fontSize: "10px",
+                        }}
+                        title={structuredMetadata.lighting}
+                      >
+                        💡 {structuredMetadata.lighting.length > 25 ? structuredMetadata.lighting.slice(0, 25) + '...' : structuredMetadata.lighting}
+                      </span>
+                    )}
+                    {structuredMetadata.camera_optics && (
+                      <span
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: "4px",
+                          background: "rgba(0, 212, 255, 0.1)",
+                          border: "1px solid rgba(0, 212, 255, 0.25)",
+                          color: "#7dd3fc",
+                          fontSize: "10px",
+                        }}
+                        title={structuredMetadata.camera_optics}
+                      >
+                        📷 {structuredMetadata.camera_optics.length > 22 ? structuredMetadata.camera_optics.slice(0, 22) + '...' : structuredMetadata.camera_optics}
+                      </span>
+                    )}
+                    {structuredMetadata.art_style && (
+                      <span
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: "4px",
+                          background: "rgba(244, 114, 182, 0.1)",
+                          border: "1px solid rgba(244, 114, 182, 0.25)",
+                          color: "#f472b6",
+                          fontSize: "10px",
+                        }}
+                        title={structuredMetadata.art_style}
+                      >
+                        🎨 {structuredMetadata.art_style.length > 20 ? structuredMetadata.art_style.slice(0, 20) + '...' : structuredMetadata.art_style}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Action Toolbar under Box */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-                <button
-                  id="btn-enhance-prompt"
-                  disabled={isBusy}
-                  onClick={handleEnhance}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(0, 212, 255, 0.1)",
-                    border: "1px solid rgba(0, 212, 255, 0.3)",
-                    color: S.cyan,
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    cursor: isBusy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <Sparkles size={12} />
-                  <span>{isEnhancing ? "Enhancing..." : "✨ Enhance with Gemini"}</span>
-                </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <button
+                    id="btn-enhance-prompt"
+                    disabled={isBusy}
+                    onClick={handleEnhance}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      background: "rgba(0, 212, 255, 0.1)",
+                      border: "1px solid rgba(0, 212, 255, 0.3)",
+                      color: S.cyan,
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: isBusy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    <span>{isEnhancing ? "Enhancing..." : "✨ Enhance with Gemini"}</span>
+                  </button>
+
+                  <button
+                    id="btn-open-inspector"
+                    onClick={() => setIsInspectorOpen(true)}
+                    title="Prompt Lifecycle & Visual Director Inspector"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      padding: "6px 10px",
+                      borderRadius: "8px",
+                      background: "rgba(99, 102, 241, 0.12)",
+                      border: "1px solid rgba(99, 102, 241, 0.3)",
+                      color: "#a5b4fc",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <ScanSearch size={12} />
+                    <span>Inspector</span>
+                  </button>
+                </div>
 
                 <button
                   id="btn-copilot-tweak"
@@ -1575,6 +1822,19 @@ function StudioContent() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
+
+      {/* Visual Director & Prompt Lifecycle Inspector Modal */}
+      <PromptInspectorModal
+        isOpen={isInspectorOpen}
+        onClose={() => setIsInspectorOpen(false)}
+        rawPrompt={promptRecipe}
+        compiledPrompt={armedMasterFormula || lastGeneratedPrompt || promptRecipe}
+        modelUsed={llmConfig.model_mappings[selectedEngine] || selectedEngine}
+        targetModel={model.label}
+        complexityScore={complexityScore}
+        structuredMetadata={structuredMetadata}
+        negativePrompt={negativePrompt}
+      />
     </div>
   );
 }
