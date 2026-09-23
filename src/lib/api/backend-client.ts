@@ -15,6 +15,9 @@ function getWsUrl(path: string): string {
 }
 
 async function getAuthHeader(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "ngrok-skip-browser-warning": "true",
+  };
   try {
     const supabase = createClient();
     if (supabase) {
@@ -22,11 +25,11 @@ async function getAuthHeader(): Promise<Record<string, string>> {
         data: { session },
       } = await supabase.auth.getSession();
       if (session?.access_token) {
-        return { Authorization: `Bearer ${session.access_token}` };
+        headers["Authorization"] = `Bearer ${session.access_token}`;
       }
     }
   } catch {}
-  return {};
+  return headers;
 }
 
 /**

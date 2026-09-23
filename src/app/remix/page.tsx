@@ -16,11 +16,18 @@ import RemixWorkspace from "./[id]/RemixWorkspace";
 function RemixLaunchpadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryRef = searchParams.get("ref");
-  const queryPrompt = searchParams.get("prompt");
+  const queryRef =
+    searchParams.get("ref") ||
+    searchParams.get("anchorImageUrl") ||
+    searchParams.get("imageUrl") ||
+    searchParams.get("image");
+  const queryPrompt =
+    searchParams.get("prompt") ||
+    searchParams.get("initialPrompt") ||
+    "";
 
   const [activeRef, setActiveRef] = useState<string | null>(queryRef || null);
-  const [activePrompt, setActivePrompt] = useState<string>(queryPrompt || "");
+  const [activePrompt, setActivePrompt] = useState<string>(queryPrompt);
   const [recentGens, setRecentGens] = useState<Generation[]>([]);
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [isDragging, setIsDragging] = useState(false);
