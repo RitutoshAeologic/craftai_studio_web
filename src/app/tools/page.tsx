@@ -33,6 +33,7 @@ import { RelightPresetId } from "@/lib/utils/image-processing";
 import { useUser } from "@/context/UserContext";
 import { toolsApi, type ToolHistoryItem, type BaseToolResponse } from "@/lib/api/toolsApi";
 import { ToolHistoryModal } from "@/components/tools/ToolHistoryModal";
+import { saveGeneration } from "@/lib/supabase/db";
 
 const S = {
   bg:          "#0b0b0f",
@@ -398,7 +399,7 @@ function ToolsContent() {
     setErrorMessage(null);
 
     try {
-      let res: BaseToolResponse;
+      let res: BaseToolResponse | null = null;
 
       if (activeTab === "cutout") {
         res = await toolsApi.removeBackground(sourceImage, user?.id);
@@ -467,8 +468,59 @@ function ToolsContent() {
         setViewMode("result");
       }
 
-      if (res! && res!.credits_deducted > 0) {
+      if (res && res.credits_deducted > 0) {
         window.dispatchEvent(new Event("craftai_wallet_updated"));
+      }
+
+      // Auto-save output to live Supabase DB and Cloud Library
+      if (res) {
+        const finalUrl = res.cutout_url || res.output_url || res.image_url;
+        if (finalUrl) {
+          const promptLabel =
+            activeTab === "cutout"
+              ? "Background Cutout (RMBG-1.4)"
+              : activeTab === "ai_background"
+              ? `AI Background (${bgMode})`
+              : activeTab === "ai_expand"
+              ? `AI Expand Outpaint (${expandRatio})`
+              : activeTab === "upscale"
+              ? `AI Upscale (${upscaleScale}x)`
+              : activeTab === "product_detail"
+              ? `Product Detail (${productName || "Product Showroom"})`
+              : activeTab === "marketing_poster"
+              ? `Marketing Poster (${posterTopic || "Promotional Launch"})`
+              : "AI Tool Edit";
+
+          const toolTypeTag =
+            activeTab === "cutout"
+              ? "TOOL_CUTOUT"
+              : activeTab === "ai_background"
+              ? "TOOL_AI_BACKGROUND"
+              : activeTab === "ai_expand"
+              ? "TOOL_AI_EXPAND"
+              : activeTab === "upscale"
+              ? "TOOL_UPSCALE"
+              : activeTab === "product_detail"
+              ? "TOOL_PRODUCT_DETAIL"
+              : activeTab === "marketing_poster"
+              ? "TOOL_MARKETING_POSTER"
+              : "TOOL_EDIT";
+
+          const effectiveUserId = user?.id || "de70bc1b-7d20-4d3a-b486-09200c8f8340";
+          saveGeneration(
+            {
+              prompt: promptLabel,
+              image_url: finalUrl,
+              model: "CraftAI Tool Engine",
+              aspect_ratio: "1:1",
+              user_id: effectiveUserId,
+              type: toolTypeTag,
+              credits_deducted: res.credits_deducted || 0,
+              is_download_unlocked: activeTab === "cutout" || (activeTab === "ai_background" && bgMode === "pure_white"),
+            },
+            effectiveUserId
+          ).catch((err) => console.warn("Auto-save tool creation notice:", err));
+        }
       }
     } catch (err: any) {
       console.error("Tool execution error:", err);

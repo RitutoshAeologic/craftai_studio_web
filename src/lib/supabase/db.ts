@@ -338,24 +338,24 @@ export function getUserGenerationsKey(userIdentifier?: string): string {
   return `craftai_generations_${clean}`;
 }
 
-/* ── Fetch Generations History (User-Scoped, No Mock Seed Rebirth) ─ */
+/* ── Fetch Generations History (User-Scoped, Connected to live Supabase jobs) ─ */
 export async function fetchGenerations(userIdentifier?: string): Promise<Generation[]> {
   const key = getUserGenerationsKey(userIdentifier);
 
+  // 1. Check local cache first for 0ms instant render
+  let cachedGens: Generation[] = [];
   if (typeof window !== "undefined") {
     try {
       const cached = localStorage.getItem(key);
       if (cached !== null) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          // Filter out junk/test and static seed items so user only sees real generations
-          const userGens = parsed.filter((g: Generation) => {
+          cachedGens = parsed.filter((g: Generation) => {
             if (!g || !g.id) return false;
             if (["gen-1", "gen-2", "gen-3", "gen-4", "gen-5"].includes(g.id)) return false;
             const p = (g.prompt || "").trim().toLowerCase();
             return p.length >= 3 && !p.startsWith("hrll") && !p.startsWith("test");
           });
-          return userGens;
         }
       }
     } catch {
@@ -363,39 +363,44 @@ export async function fetchGenerations(userIdentifier?: string): Promise<Generat
     }
   }
 
-  // If Supabase table exists, try fetching records associated with user
-  const supabase = createClient();
-  if (supabase && userIdentifier && userIdentifier !== "default" && userIdentifier !== "guest") {
-    try {
-      let query = supabase.from("generations").select("*").order("created_at", { ascending: false });
-      if (userIdentifier.includes("@")) {
-        query = query.eq("user_email", userIdentifier);
-      } else {
-        query = query.eq("user_id", userIdentifier);
-      }
-      const { data, error } = await query;
+  // 2. Fetch from live Supabase jobs API
+  try {
+    const targetUserId =
+      userIdentifier && !userIdentifier.includes("@") && userIdentifier !== "default"
+        ? userIdentifier
+        : "de70bc1b-7d20-4d3a-b486-09200c8f8340";
 
-      if (!error && data) {
+    const res = await fetch(`/api/jobs?user_id=${encodeURIComponent(targetUserId)}`);
+    if (res.ok) {
+      const { jobs } = await res.json();
+      if (Array.isArray(jobs) && jobs.length > 0) {
+        const mapped: Generation[] = jobs.map((j: any) => ({
+          id: j.job_id || j.id,
+          prompt: j.prompt,
+          image_url: j.preview_url,
+          model: j.type || "FLUX.1",
+          aspect_ratio: "1:1",
+          user_id: j.user_id,
+          created_at: j.created_at,
+          is_download_unlocked: Boolean(j.is_download_unlocked),
+          credits_deducted: j.credits_deducted || 0,
+          type: j.type,
+        }));
+
         if (typeof window !== "undefined") {
-          localStorage.setItem(key, JSON.stringify(data));
+          localStorage.setItem(key, JSON.stringify(mapped));
         }
-        return data as Generation[];
+        return mapped;
       }
-    } catch {
-      // Ignore Supabase error
     }
+  } catch (e) {
+    console.warn("Supabase jobs fetch error:", e);
   }
 
-  // When user has no generations or deleted them all, return clean empty list
-  if (typeof window !== "undefined") {
-    if (localStorage.getItem(key) === null) {
-      localStorage.setItem(key, JSON.stringify([]));
-    }
-  }
-  return [];
+  return cachedGens;
 }
 
-/* ── Save or Update a Generation in DB & Cache (User Associated & Session Aware) ────── */
+/* ── Save or Update a Generation in DB & Cache (User Associated & Supabase Synced) ────── */
 export async function saveGeneration(
   gen: Omit<Generation, "id" | "created_at">,
   userIdentifier?: string,
@@ -407,7 +412,7 @@ export async function saveGeneration(
   }
 
   const resolvedUserEmail = gen.user_email || (userIdentifier && userIdentifier.includes("@") ? userIdentifier : undefined);
-  const resolvedUserId = gen.user_id || (userIdentifier && !userIdentifier.includes("@") ? userIdentifier : undefined);
+  const resolvedUserId = gen.user_id || (userIdentifier && !userIdentifier.includes("@") ? userIdentifier : "de70bc1b-7d20-4d3a-b486-09200c8f8340");
   const key = getUserGenerationsKey(userIdentifier || resolvedUserEmail || resolvedUserId);
 
   let targetId = existingId || null;
@@ -425,7 +430,7 @@ export async function saveGeneration(
   }
 
   if (!targetId || !isUpdate) {
-    targetId = `gen-${Date.now()}`;
+    targetId = `gen_${Date.now()}`;
   }
 
   const savedGen: Generation = {
@@ -447,7 +452,7 @@ export async function saveGeneration(
         : [];
       
       const filtered = cleanCurrent.filter((g) => g.id !== targetId);
-      const updated = [savedGen, ...filtered].slice(0, 30);
+      const updated = [savedGen, ...filtered].slice(0, 50);
       localStorage.setItem(key, JSON.stringify(updated));
 
       // Also update default key if distinct
@@ -459,7 +464,7 @@ export async function saveGeneration(
             ? defCurrent.filter((g) => !["gen-1", "gen-2", "gen-3", "gen-4", "gen-5"].includes(g.id))
             : [];
           const defFiltered = defClean.filter((g) => g.id !== targetId);
-          localStorage.setItem(GENERATIONS_KEY, JSON.stringify([savedGen, ...defFiltered].slice(0, 30)));
+          localStorage.setItem(GENERATIONS_KEY, JSON.stringify([savedGen, ...defFiltered].slice(0, 50)));
         } catch {}
       }
 
@@ -469,27 +474,42 @@ export async function saveGeneration(
     }
   }
 
-  // 2. Persist to Supabase in the background
-  const supabase = createClient();
-  if (supabase) {
-    try {
-      if (isUpdate) {
-        await supabase
-          .from("generations")
-          .update({
-            prompt: savedGen.prompt,
-            image_url: savedGen.image_url,
-            model: savedGen.model,
-            aspect_ratio: savedGen.aspect_ratio,
-            created_at: savedGen.created_at,
-          })
-          .eq("id", targetId);
-      } else {
-        await supabase.from("generations").insert([savedGen]);
-      }
-    } catch (e) {
-      console.warn("Supabase generation save/update background notice", e);
-    }
+  // 2. Persist to live Supabase jobs table in the background
+  try {
+    fetch("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        job_id: targetId,
+        user_id: resolvedUserId,
+        type: gen.type || "IMAGE_GEN",
+        status: "completed",
+        prompt: cleanPrompt,
+        preview_url: savedGen.image_url,
+        credits_deducted: gen.credits_deducted || 0,
+        is_download_unlocked: gen.is_download_unlocked || false,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.job?.preview_url && data.job.preview_url !== savedGen.image_url) {
+          savedGen.image_url = data.job.preview_url;
+          if (typeof window !== "undefined") {
+            try {
+              const cached = localStorage.getItem(key);
+              if (cached) {
+                const list: Generation[] = JSON.parse(cached);
+                const updated = list.map((g) => (g.id === targetId ? { ...g, image_url: data.job.preview_url } : g));
+                localStorage.setItem(key, JSON.stringify(updated));
+                window.dispatchEvent(new Event("craftai_generations_updated"));
+              }
+            } catch {}
+          }
+        }
+      })
+      .catch((e) => console.warn("Supabase background job sync notice:", e));
+  } catch (e) {
+    console.warn("Supabase job sync error:", e);
   }
 
   return savedGen;
@@ -523,14 +543,9 @@ export async function deleteGeneration(id: string, userIdentifier?: string): Pro
     }
   }
 
-  const supabase = createClient();
-  if (supabase) {
-    try {
-      await supabase.from("generations").delete().eq("id", id);
-    } catch {
-      // Ignore
-    }
-  }
+  try {
+    await fetch(`/api/jobs?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  } catch {}
 }
 
 /* ── Fetch Single Artwork by ID ──────────────────────────────── */
@@ -803,13 +818,17 @@ export async function unlockGenerationDownload(
     window.dispatchEvent(new Event("craftai_generations_updated"));
   }
 
+  try {
+    fetch("/api/jobs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, is_download_unlocked: true }),
+    }).catch(() => {});
+  } catch {}
+
   const supabase = createClient();
   if (supabase) {
     try {
-      await supabase
-        .from("generations")
-        .update({ is_download_unlocked: true })
-        .eq("id", id);
       await supabase
         .from("jobs")
         .update({ is_download_unlocked: true })
