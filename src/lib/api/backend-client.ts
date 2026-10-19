@@ -481,6 +481,58 @@ export async function editPresetTool(params: {
   };
 }
 
+export async function upscaleImageTool(params: {
+  image_url?: string;
+  imageUrl?: string;
+  image_id?: string;
+  imageId?: string;
+  scale?: 2 | 4;
+  scale_factor?: 2 | 4;
+  mode?: "photo" | "portrait" | "anime" | "fast";
+  user_id?: string;
+  userId?: string;
+}): Promise<{
+  task_id: string;
+  status: string;
+  scale: number;
+  mode: string;
+  original_resolution: string;
+  upscaled_resolution: string;
+  output_url: string;
+  image_url: string;
+  tokens_consumed?: number;
+  is_free?: boolean;
+  engine: string;
+}> {
+  const authHeader = await getAuthHeader();
+  const effectiveScale = params.scale_factor || params.scale || 2;
+  const res = await fetch(
+    `${BACKEND_URL}/api/v1/prompt-engineering/tools/upscale`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader,
+      },
+      body: JSON.stringify({
+        image_url: params.image_url || params.imageUrl,
+        image_id: params.image_id || params.imageId,
+        scale: effectiveScale,
+        scale_factor: effectiveScale,
+        mode: params.mode || "photo",
+        user_id: params.user_id || params.userId,
+      }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Upscale failed: ${res.statusText}`);
+  }
+  const data = await res.json();
+  if (!data.image_url) data.image_url = data.output_url || "";
+  if (!data.output_url) data.output_url = data.image_url || "";
+  return data;
+}
+
 /* ─────────────────────────────────────────────────────────────
    6. Ephemeral Face-Lock Reference Photo Upload & Cleanup
    POST /api/v1/prompt-engineering/upload-reference

@@ -262,8 +262,10 @@ function ToolsContent() {
   const [expandRatio, setExpandRatio] = useState<string>("16:9");
   const [expandQuality, setExpandQuality] = useState<"1k" | "2k">("1k");
 
-  // Upscale State
+  // Upscale State (Zero-Token Super-Resolution)
   const [upscaleScale, setUpscaleScale] = useState<2 | 4>(2);
+  const [upscaleMode, setUpscaleMode] = useState<"photo" | "portrait" | "anime" | "fast">("photo");
+  const [upscaleMeta, setUpscaleMeta] = useState<{ originalRes?: string; upscaledRes?: string; engine?: string } | null>(null);
   const [isUpscaleActive, setIsUpscaleActive] = useState<boolean>(true);
 
   // Product Detail State
@@ -434,12 +436,21 @@ function ToolsContent() {
       } else if (activeTab === "upscale") {
         res = await toolsApi.upscaleImage({
           imageUrl: sourceImage,
+          scale: upscaleScale,
           scaleFactor: upscaleScale,
+          mode: upscaleMode,
           userId: user?.id,
         });
         const url = res.output_url || res.image_url;
         setToolOutput(url);
         setIsUpscaleActive(true);
+        if (res.original_resolution && res.upscaled_resolution) {
+          setUpscaleMeta({
+            originalRes: res.original_resolution,
+            upscaledRes: res.upscaled_resolution,
+            engine: res.engine,
+          });
+        }
         setViewMode("slider");
         setSliderPos(50);
       } else if (activeTab === "product_detail") {
@@ -516,7 +527,7 @@ function ToolsContent() {
               user_id: effectiveUserId,
               type: toolTypeTag,
               credits_deducted: res.credits_deducted || 0,
-              is_download_unlocked: activeTab === "cutout" || (activeTab === "ai_background" && bgMode === "pure_white"),
+              is_download_unlocked: activeTab === "cutout" || activeTab === "upscale" || (activeTab === "ai_background" && bgMode === "pure_white"),
             },
             effectiveUserId
           ).catch((err) => console.warn("Auto-save tool creation notice:", err));
@@ -726,7 +737,7 @@ function ToolsContent() {
             }}
           >
             <Maximize2 size={15} style={{ color: S.success }} />
-            <span>Upscale 4K (2 Cr)</span>
+            <span>Upscale 4K (Free)</span>
           </button>
 
           <button
@@ -1518,7 +1529,7 @@ function ToolsContent() {
                     <span>4K Super-Resolution Detail Upscaler</span>
                   </div>
                   <p style={{ margin: "6px 0 0", fontSize: "12px", color: S.textSecondary, lineHeight: 1.5 }}>
-                    Lanczos + UnsharpMask micro-texture detail upscaler restoring ultra-clear lines up to 4096px.
+                    Zero-token optical super-resolution with Lanczos multi-frequency unsharp masking restoring ultra-clear lines up to 4096px.
                   </p>
                 </div>
 
@@ -1530,7 +1541,7 @@ function ToolsContent() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
                     {[
                       { factor: 2, label: "2X Super HD", detail: "2048 × 2048 px" },
-                      { factor: 4, label: "4X Master Ultra", detail: "4096 × 4096 px" },
+                      { factor: 4, label: "4X Ultra 4K", detail: "4096 × 4096 px" },
                     ].map((s) => (
                       <button
                         key={s.factor}
@@ -1543,6 +1554,7 @@ function ToolsContent() {
                           color: upscaleScale === s.factor ? "#ffffff" : S.textSecondary,
                           cursor: "pointer",
                           textAlign: "center",
+                          transition: "all 0.15s ease",
                         }}
                       >
                         <div style={{ fontSize: "13px", fontWeight: 700 }}>{s.label}</div>
@@ -1551,6 +1563,68 @@ function ToolsContent() {
                     ))}
                   </div>
                 </div>
+
+                {/* Enhancement Mode Selection */}
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                    Enhancement Mode
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
+                    {[
+                      { mode: "photo", label: "Photo", desc: "Fine micro-textures & edges" },
+                      { mode: "portrait", label: "Portrait", desc: "Face feature clarity & contouring" },
+                      { mode: "anime", label: "Anime / Art", desc: "Clean lines & crisp colors" },
+                      { mode: "fast", label: "Fast (<50ms)", desc: "Sub-second instant Lanczos" },
+                    ].map((m) => (
+                      <button
+                        key={m.mode}
+                        onClick={() => setUpscaleMode(m.mode as any)}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "10px",
+                          background: upscaleMode === m.mode ? "rgba(16, 185, 129, 0.15)" : S.card,
+                          border: upscaleMode === m.mode ? `1px solid ${S.success}` : `1px solid ${S.borderLight}`,
+                          color: upscaleMode === m.mode ? "#ffffff" : S.textSecondary,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: upscaleMode === m.mode ? S.success : "#ffffff" }}>
+                          {m.label}
+                        </div>
+                        <div style={{ fontSize: "10.5px", color: S.textMuted, marginTop: "2px", lineHeight: 1.3 }}>
+                          {m.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Upscale Meta Output Pill */}
+                {upscaleMeta && (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: "rgba(16, 185, 129, 0.08)",
+                      border: "1px solid rgba(16, 185, 129, 0.25)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11px", color: S.success, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                      <span>Resolution Enhancement</span>
+                      <span>{upscaleMeta.originalRes} → {upscaleMeta.upscaledRes}</span>
+                    </div>
+                    {upscaleMeta.engine && (
+                      <div style={{ fontSize: "10px", color: S.textSecondary }}>
+                        Engine: {upscaleMeta.engine} • Zero Tokens
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   onClick={handleExecuteActiveTool}
@@ -1572,7 +1646,7 @@ function ToolsContent() {
                   }}
                 >
                   <Maximize2 size={16} />
-                  <span>{isProcessing ? "Synthesizing 4K..." : "Upscale Image (2 Credits)"}</span>
+                  <span>{isProcessing ? "Synthesizing Super-Resolution..." : "Upscale Image (Free / 0 Tokens)"}</span>
                 </button>
               </>
             )}

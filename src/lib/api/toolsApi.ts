@@ -10,7 +10,7 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   (process.env.NEXT_PUBLIC_BACKEND_URL
     ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1`
-    : "http://127.0.0.1:8000/api/v1");
+    : "http://127.0.0.1:8001/api/v1");
 
 let customAuthToken: string | null = null;
 
@@ -58,6 +58,10 @@ export interface BaseToolResponse {
   mode?: string;
   target_ratio?: string;
   resolution?: string;
+  original_resolution?: string;
+  upscaled_resolution?: string;
+  engine?: string;
+  is_free?: boolean;
   product_name?: string;
   topic?: string;
   headline?: string;
@@ -79,10 +83,33 @@ export interface AiExpandPayload {
   userId?: string;
 }
 
-export interface UpscalePayload {
-  imageUrl: string;
+export interface UpscaleParams {
+  imageUrl?: string;
+  image_url?: string;
+  imageId?: string;
+  image_id?: string;
+  scale?: 2 | 4;
   scaleFactor?: 2 | 4 | number | string;
+  scale_factor?: 2 | 4 | number | string;
+  mode?: "photo" | "portrait" | "anime" | "fast";
   userId?: string;
+  user_id?: string;
+}
+
+export type UpscalePayload = UpscaleParams;
+
+export interface UpscaleResponse {
+  task_id: string;
+  status: "completed" | "failed" | string;
+  scale: number;
+  mode: "photo" | "portrait" | "anime" | "fast" | string;
+  original_resolution: string;
+  upscaled_resolution: string;
+  output_url: string;
+  image_url: string;
+  tokens_consumed?: number;
+  is_free?: boolean;
+  engine: string;
 }
 
 export interface ProductDetailPayload {
@@ -123,7 +150,10 @@ async function handleToolRequest<T extends BaseToolResponse>(
   body: Record<string, any>
 ): Promise<T> {
   const headers = await getRequestHeaders();
-  const url = `${API_BASE}/prompt-engineering/tools${endpoint}`;
+  const base = API_BASE.replace(/\/+$/, "");
+  const url = base.endsWith("/api/v1")
+    ? `${base}/prompt-engineering/tools${endpoint}`
+    : `${base}/api/v1/prompt-engineering/tools${endpoint}`;
 
   try {
     const res = await fetch(url, {
@@ -154,6 +184,60 @@ async function handleToolRequest<T extends BaseToolResponse>(
   }
 }
 
+// ── Standalone Upscale Functions matching Spec ─────────────────────────
+export async function upscaleImage({
+  imageUrl,
+  image_url,
+  imageId,
+  image_id,
+  scale = 2,
+  mode = "photo",
+  userId,
+  user_id,
+}: UpscaleParams): Promise<UpscaleResponse> {
+  const base = API_BASE.replace(/\/+$/, "");
+  const url = base.endsWith("/api/v1")
+    ? `${base}/prompt-engineering/tools/upscale`
+    : `${base}/api/v1/prompt-engineering/tools/upscale`;
+
+  const headers = await getRequestHeaders();
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      image_url: imageUrl || image_url,
+      image_id: imageId || image_id,
+      scale: scale,
+      scale_factor: scale,
+      mode: mode,
+      user_id: userId || user_id,
+    }),
+  });
+
+  if (!res.ok) {
+    let errMessage = `Upscale failed: ${res.statusText}`;
+    try {
+      const errJson = await res.json();
+      errMessage = errJson.message || errJson.detail || errMessage;
+    } catch {}
+    throw new Error(errMessage);
+  }
+
+  const data = (await res.json()) as UpscaleResponse;
+  if (!data.image_url) data.image_url = data.output_url || "";
+  if (!data.output_url) data.output_url = data.image_url || "";
+  return data;
+}
+
+export async function upscaleWithFetch(
+  imageUrl: string,
+  scale: 2 | 4 = 2,
+  mode: "photo" | "portrait" | "anime" | "fast" = "photo"
+): Promise<string> {
+  const data = await upscaleImage({ imageUrl, scale, mode });
+  return data.output_url || data.image_url;
+}
+
 // ── API Methods ────────────────────────────────────────────────────────
 export const toolsApi = {
   // 1. Remove Background (Free / 0 Cr)
@@ -179,9 +263,22 @@ export const toolsApi = {
     return handleToolRequest<BaseToolResponse>("/ai-expand", payload);
   },
 
-  // 4. Upscale 4K (2 Cr)
-  upscaleImage: async (payload: UpscalePayload): Promise<BaseToolResponse> => {
-    return handleToolRequest<BaseToolResponse>("/upscale", payload);
+  // 4. Upscale Super-Resolution (Zero-Token Free Tool)
+  upscaleImage: async (
+    payload: UpscalePayload
+  ): Promise<UpscaleResponse & BaseToolResponse> => {
+    const scale =
+      payload.scale ||
+      (typeof payload.scaleFactor === "number" ? (payload.scaleFactor as 2 | 4) : 2);
+    const body = {
+      image_url: payload.imageUrl || payload.image_url,
+      image_id: payload.imageId || payload.image_id,
+      scale: scale,
+      scale_factor: payload.scale_factor || scale,
+      mode: payload.mode || "photo",
+      user_id: payload.userId || payload.user_id,
+    };
+    return handleToolRequest<UpscaleResponse & BaseToolResponse>("/upscale", body);
   },
 
   // 5. Product Detail (10 Cr)
@@ -216,7 +313,11 @@ export const toolsApi = {
     });
     if (toolType) query.append("tool_type", toolType);
 
-    const url = `${API_BASE}/prompt-engineering/tools/history?${query.toString()}`;
+    const base = API_BASE.replace(/\/+$/, "");
+    const url = base.endsWith("/api/v1")
+      ? `${base}/prompt-engineering/tools/history?${query.toString()}`
+      : `${base}/api/v1/prompt-engineering/tools/history?${query.toString()}`;
+
     try {
       const res = await fetch(url, { headers });
       if (res.ok) {
