@@ -162,14 +162,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    const supabase = createClient();
-    if (supabase) {
-      await supabase.auth.signOut();
+    try {
+      const supabase = createClient();
+      let token: string | undefined;
+      if (supabase) {
+        const { data } = await supabase.auth.getSession();
+        token = data.session?.access_token;
+      }
+      if (token) {
+        const backendUrl =
+          process.env.NEXT_PUBLIC_API_URL ||
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          "http://127.0.0.1:8001";
+        const endpoint = backendUrl.includes("/api/v1")
+          ? `${backendUrl}/auth/signout`
+          : `${backendUrl}/api/v1/auth/signout`;
+        await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }).catch(() => {});
+      }
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.warn("[UserContext.signOut] Notice:", err);
     }
     setUser(null);
     setProfile(DEFAULT_PROFILE);
     try {
       localStorage.removeItem(USER_STORAGE_KEY);
+      window.dispatchEvent(new Event("craftai_wallet_updated"));
     } catch {
       // Ignore
     }

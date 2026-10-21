@@ -20,7 +20,7 @@ export default function LoginPage() {
   const supabase = createClient();
 
   function handleDemoLogin() {
-    router.push("/studio");
+    router.push("/");
   }
 
   async function handleEmailSignIn(e: React.FormEvent) {
@@ -34,7 +34,7 @@ export default function LoginPage() {
       }
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
-      else router.push("/studio");
+      else router.push("/");
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
@@ -53,7 +53,7 @@ export default function LoginPage() {
     }
     await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/studio` },
+      options: { redirectTo: `${window.location.origin}/` },
     });
   }
 
@@ -65,7 +65,7 @@ export default function LoginPage() {
     <>
       {/* Logo above card */}
       <div className="mb-8">
-        <Logo size="lg" href="/studio" />
+        <Logo size="lg" href="/" />
       </div>
 
       {/* Glassmorphic card */}

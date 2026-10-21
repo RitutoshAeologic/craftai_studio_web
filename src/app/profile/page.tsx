@@ -18,13 +18,14 @@ import {
   CheckCircle2,
   Trash2,
   Cpu,
+  LogOut,
 } from "lucide-react";
 import { fetchGenerations, fetchArtworks, deleteGeneration, type Generation, type Artwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { profile, user, updateProfile } = useUser();
+  const { profile, user, updateProfile, signOut } = useUser();
   const userKey = user?.id || profile.email || "default";
   const [activeTab, setActiveTab] = useState<"creations" | "favorites" | "settings">("creations");
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -172,6 +173,30 @@ export default function ProfilePage() {
             >
               <Settings size={14} />
               <span>Settings</span>
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm("Are you sure you want to sign out of CraftAI Studio?")) {
+                  signOut();
+                }
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "9px 16px",
+                borderRadius: "10px",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "#f87171",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              <LogOut size={14} />
+              <span>Sign Out</span>
             </button>
             <button
               onClick={() => router.push("/")}
@@ -658,6 +683,49 @@ export default function ProfilePage() {
             >
               {savedNotice ? "✓ Profile & Preferences Saved!" : "Save Profile & Preferences"}
             </button>
+
+            {/* Account & Session Sign Out */}
+            <div
+              style={{
+                marginTop: "24px",
+                paddingTop: "20px",
+                borderTop: "1px solid #1e293b",
+              }}
+            >
+              <h4 style={{ margin: "0 0 6px", fontSize: "14px", fontWeight: 700, color: "#f87171" }}>
+                Account &amp; Session
+              </h4>
+              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "#64748b" }}>
+                Signed in as <span style={{ color: "#cbd5e1" }}>{user?.email || profile.email}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to sign out of CraftAI Studio?")) {
+                    signOut();
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  background: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  color: "#f87171",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <LogOut size={16} />
+                <span>Sign Out of Account</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -37,7 +37,7 @@ export default function RegisterPage() {
   const strength = getPasswordStrength(password);
 
   function handleDemoLogin() {
-    router.push("/studio");
+    router.push("/");
   }
 
   async function handleSignUp(e: React.FormEvent) {
@@ -78,7 +78,7 @@ export default function RegisterPage() {
     }
     await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/studio` },
+      options: { redirectTo: `${window.location.origin}/` },
     });
   }
 
@@ -141,7 +141,7 @@ export default function RegisterPage() {
     <>
       {/* Logo */}
       <div className="mb-8">
-        <Logo size="lg" href="/studio" />
+        <Logo size="lg" href="/" />
       </div>
 
       {/* Card */}

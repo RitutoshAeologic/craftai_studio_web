@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, PanelLeftOpen } from "lucide-react";
+import { Bell, PanelLeftOpen, LogOut } from "lucide-react";
 import { useDrawer } from "@/context/DrawerContext";
 import { useUser } from "@/context/UserContext";
 
 export default function TopBar() {
   const pathname = usePathname();
   const { isOpen, toggleDrawer } = useDrawer();
-  const { profile } = useUser();
+  const { profile, signOut } = useUser();
 
   const getPageTitle = () => {
     if (pathname === "/") return "AI Chat Workspace";
@@ -160,6 +160,44 @@ export default function TopBar() {
               {profile.name}
             </span>
           </Link>
+
+          <button
+            id="topbar-signout-btn"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.confirm("Are you sure you want to sign out?")) {
+                signOut();
+              }
+            }}
+            title="Sign Out of CraftAI Studio"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              height: "32px",
+              padding: "0 12px",
+              borderRadius: "8px",
+              background: "rgba(239, 68, 68, 0.08)",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              color: "#f87171",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(239, 68, 68, 0.18)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#ef4444";
+              (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(239, 68, 68, 0.08)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(239, 68, 68, 0.25)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#f87171";
+            }}
+          >
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
     </header>
