@@ -392,6 +392,7 @@ export default function LibraryPage() {
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
+                        setGenerations((prev) => prev.filter((g) => g.id !== item.id));
                         await deleteGeneration(item.id, userKey);
                       }}
                       title="Delete from Library"

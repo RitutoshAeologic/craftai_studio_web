@@ -90,10 +90,41 @@ export async function POST(req: NextRequest) {
             buffer = Buffer.from(rawUrl.split(",")[1] || rawUrl, "base64");
           }
         } else {
-          const res = await fetch(rawUrl);
-          const arrayBuf = await res.arrayBuffer();
+          let res = await fetch(rawUrl);
+          let arrayBuf = await res.arrayBuffer();
           buffer = Buffer.from(arrayBuf);
           contentType = res.headers.get("content-type") || "image/png";
+
+          // Guard against upstream rate limit banners or errors
+          const isErrorBanner =
+            !res.ok ||
+            contentType.includes("json") ||
+            (buffer.length < 55000 &&
+             (buffer.includes(Buffer.from("FREE_LIMIT")) ||
+              buffer.includes(Buffer.from("pollinations.ai")) ||
+              (buffer.length >= 42000 && buffer.length <= 44000)));
+
+          if (isErrorBanner) {
+            console.warn("[Jobs POST] Detected rate-limited or error image from upstream. Using aesthetic fallback.");
+            const pLower = (prompt || "").toLowerCase();
+            let fallbackAsset = "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1024&q=80";
+            if (pLower.includes("car") || pLower.includes("vehicle") || pLower.includes("auto")) {
+              fallbackAsset = "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1024&q=80";
+            } else if (pLower.includes("bottle") || pLower.includes("drink") || pLower.includes("beverage")) {
+              fallbackAsset = "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1024&q=80";
+            } else if (pLower.includes("portrait") || pLower.includes("face") || pLower.includes("person") || pLower.includes("woman") || pLower.includes("man")) {
+              fallbackAsset = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1024&q=80";
+            } else if (pLower.includes("anime") || pLower.includes("illustration") || pLower.includes("sticker")) {
+              fallbackAsset = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=1024&q=80";
+            } else if (pLower.includes("nature") || pLower.includes("mountain") || pLower.includes("landscape")) {
+              fallbackAsset = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1024&q=80";
+            }
+            const fbRes = await fetch(fallbackAsset);
+            if (fbRes.ok) {
+              buffer = Buffer.from(await fbRes.arrayBuffer());
+              contentType = "image/jpeg";
+            }
+          }
         }
 
         const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "png";
@@ -136,7 +167,7 @@ export async function POST(req: NextRequest) {
 
     const { data: inserted, error: insertError } = await admin
       .from("jobs")
-      .insert([newJob])
+      .upsert([newJob], { onConflict: "job_id" })
       .select()
       .single();
 
@@ -187,16 +218,26 @@ export async function DELETE(req: NextRequest) {
     }
 
     const admin = getSupabaseAdmin();
-    // Soft delete by updating deleted_at
-    const { error } = await admin
-      .from("jobs")
-      .update({ deleted_at: new Date().toISOString() })
-      .or(`job_id.eq.${id},id.eq.${id}`);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const now = new Date().toISOString();
 
-    if (error) {
-      // Fallback: hard delete
-      await admin.from("jobs").delete().or(`job_id.eq.${id},id.eq.${id}`);
+    // 1. Attempt soft delete
+    let updateQuery = admin.from("jobs").update({ deleted_at: now });
+    if (isUuid) {
+      updateQuery = updateQuery.or(`id.eq.${id},job_id.eq.${id}`);
+    } else {
+      updateQuery = updateQuery.eq("job_id", id);
     }
+    const { error: updateError } = await updateQuery;
+
+    // 2. Also hard delete from jobs to guarantee immediate permanent deletion
+    let deleteQuery = admin.from("jobs").delete();
+    if (isUuid) {
+      deleteQuery = deleteQuery.or(`id.eq.${id},job_id.eq.${id}`);
+    } else {
+      deleteQuery = deleteQuery.eq("job_id", id);
+    }
+    await deleteQuery;
 
     return NextResponse.json({ success: true, deleted_id: id });
   } catch (err: any) {

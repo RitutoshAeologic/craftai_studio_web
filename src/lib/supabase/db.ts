@@ -520,6 +520,7 @@ export async function deleteGeneration(id: string, userIdentifier?: string): Pro
   const keysToClean = [
     getUserGenerationsKey(userIdentifier),
     GENERATIONS_KEY,
+    "craftai_db_bookmarks_v1",
   ];
 
   if (typeof window !== "undefined") {

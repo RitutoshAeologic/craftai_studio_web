@@ -249,10 +249,11 @@ function StudioContent() {
 
   // Image & Feedback Notice States
   const fallbackMain = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop";
+  const studioPollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
   const [currentImage, setCurrentImage] = useState(
     queryImage || (
       queryPrompt
-        ? `https://image.pollinations.ai/prompt/${encodeURIComponent(queryPrompt)}?model=flux&width=1024&height=1024&seed=7777&nologo=true`
+        ? `https://gen.pollinations.ai/image/${encodeURIComponent(queryPrompt)}?model=flux&width=1024&height=1024&seed=7777&nologo=true&key=${studioPollinationsKey}`
         : fallbackMain
     )
   );

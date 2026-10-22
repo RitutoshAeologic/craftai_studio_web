@@ -420,11 +420,12 @@ function GalleryCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const explorePollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
   const [imgSrc, setImgSrc] = useState(
     item.image_url ||
-      `https://image.pollinations.ai/prompt/${encP(item.prompt)}?model=flux&width=512&height=${
+      `https://gen.pollinations.ai/image/${encP(item.prompt)}?model=flux&width=512&height=${
         item.height || 360
-      }&seed=${item.seed}&nologo=true`
+      }&seed=${item.seed}&nologo=true&key=${explorePollinationsKey}`
   );
 
   const displayH = item.height || 360;

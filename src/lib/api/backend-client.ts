@@ -113,11 +113,12 @@ export async function dispatchGeneration(
   // Graceful offline fallback
   const fallbackTaskId = `task_${Math.random().toString(36).substring(2, 10)}`;
   const encoded = encodeURIComponent(params.prompt);
-  const fallbackUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux&width=${
+  const pollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
+  const fallbackUrl = `https://gen.pollinations.ai/image/${encoded}?model=flux&width=${
     params.width || 1024
   }&height=${params.height || 1024}&seed=${
     params.seed || 42
-  }&nologo=true&enhance=true`;
+  }&nologo=true&key=${pollinationsKey}`;
 
   return {
     task_id: fallbackTaskId,
@@ -151,7 +152,7 @@ export function subscribeGenerationProgress(
   let pollTimer: any = null;
 
   const wsUrl = getWsUrl(
-    `/api/v1/prompt-engineering/generation/ws/generation/${taskId}`
+    `/api/v1/prompt-engineering/ws/generation/${taskId}`
   );
 
   const startHttpPolling = () => {
@@ -166,8 +167,15 @@ export function subscribeGenerationProgress(
       }
       pollCount++;
       try {
+        const authHeader = await getAuthHeader();
         const res = await fetch(
-          `${BACKEND_URL}/api/v1/prompt-engineering/status/${taskId}`
+          `${BACKEND_URL}/api/v1/prompt-engineering/status/${taskId}`,
+          {
+            headers: {
+              ...authHeader,
+              "ngrok-skip-browser-warning": "true",
+            },
+          }
         );
         if (res.ok) {
           const data = await res.json();
