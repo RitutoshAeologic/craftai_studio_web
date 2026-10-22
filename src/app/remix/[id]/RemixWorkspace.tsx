@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { saveGeneration } from "@/lib/supabase/db";
 import { generateFreeImage, stripWatermark } from "@/lib/api/generate";
+import { dispatchGeneration, subscribeGenerationProgress, uploadReferencePhoto } from "@/lib/api/backend-client";
 import { useUser } from "@/context/UserContext";
 
 interface ChatMsg {
@@ -30,6 +31,28 @@ const QUICK_MODS = [
   "+ Watercolor Dreamscape",
 ];
 
+function cleanBasePrompt(raw?: string): string {
+  if (!raw) return "";
+  let clean = raw.trim();
+  clean = clean.replace(/^Remix\s+of\s+"[^"]*":\s*/i, "");
+  clean = clean.replace(/^Remix\s+of\s+[^:]*:\s*/i, "");
+  clean = clean.replace(/^Remix:\s*/i, "");
+
+  // Deduplicate comma-separated clauses if prompt was duplicated
+  const parts = clean.split(/,\s*/);
+  const seen = new Set<string>();
+  const uniqueParts: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    const lower = trimmed.toLowerCase();
+    if (trimmed && !seen.has(lower)) {
+      seen.add(lower);
+      uniqueParts.push(trimmed);
+    }
+  }
+  return uniqueParts.join(", ");
+}
+
 export default function RemixWorkspace({
   referenceImage,
   initialPrompt,
@@ -42,16 +65,28 @@ export default function RemixWorkspace({
   const { profile, user } = useUser();
   const userKey = user?.id || profile.email || "default";
 
-  const [currentImgUrl, setCurrentImgUrl] = useState(referenceImage);
-  const [promptMod, setPromptMod] = useState(
-    initialPrompt || "Add vibrant neon backlights, transform to cyberpunk anime aesthetic with rich iridescent highlights"
+  const basePrompt = cleanBasePrompt(initialPrompt);
+  const basePromptRef = useRef<string>(basePrompt);
+  const accumulatedEditsRef = useRef<string[]>([]);
+  const currentCanvasUrlRef = useRef<string>(referenceImage);
+  // Always starts null so the source image being remixed is NEVER replaced in Recent Generations!
+  const remixSessionId = useRef<string | null>(null);
+  const sessionTitle = useRef<string>(
+    basePrompt ? `Remix: ${basePrompt.slice(0, 32)}...` : ""
   );
+
+  const [currentImgUrl, setCurrentImgUrl] = useState(referenceImage);
+  const [viewingOriginal, setViewingOriginal] = useState(false);
+  const [promptMod, setPromptMod] = useState("");
   const [styleWeight, setStyleWeight] = useState(0.55);
   const [generating, setGenerating] = useState(false);
+  const [progressMsg, setProgressMsg] = useState("Synthesizing Image Remix...");
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
       role: "ai",
-      content: "Reference artwork locked as composition anchor. Enter your style modifications, choose quick presets below, or ask for specific lighting and texture tweaks.",
+      content: basePrompt
+        ? `Reference artwork locked: "${basePrompt.slice(0, 80)}${basePrompt.length > 80 ? "..." : ""}". Enter your modifications, choose quick presets below, or ask for specific adjustments.`
+        : "Reference artwork locked as composition anchor. Enter your style modifications, choose quick presets below, or ask for specific lighting and texture tweaks.",
       time: "Just now",
     },
   ]);
@@ -128,45 +163,137 @@ export default function RemixWorkspace({
   }, []);
 
   async function handleSend() {
-    if (!promptMod.trim() || generating) return;
+    const userInput = promptMod.trim();
+    if (!userInput || generating) return;
     setGenerating(true);
+    setPromptMod("");
 
-    const userMsg: ChatMsg = { role: "user", content: promptMod, time: "Just now" };
+    const userMsg: ChatMsg = { role: "user", content: userInput, time: "Just now" };
     setMessages((p) => [...p, userMsg]);
-    const userInput = promptMod;
     if (isMobileOrTablet) {
       setActiveMobileTab("canvas");
     }
 
+    // Accumulate modification turns so character/subject identity is never lost
+    accumulatedEditsRef.current.push(userInput);
+
+    const base = basePromptRef.current;
+    const allEdits = accumulatedEditsRef.current.join(", ");
+    let promptToSend = "";
+    if (base) {
+      promptToSend = `${base}, in the exact same visual rendering and artistic style as the reference image, with modifications: ${allEdits}, maintaining original character identity, subject consistency, and composition, ultra high quality, 8k resolution, masterpiece`;
+    } else {
+      promptToSend = `${allEdits}, in the exact same visual rendering and artistic style as the reference image, maintaining visual composition and character appearance, ultra high quality, 8k resolution, masterpiece`;
+    }
+
+    if (!sessionTitle.current) {
+      sessionTitle.current = base
+        ? `Remix: ${base.slice(0, 32)}...`
+        : `Remix: ${userInput.slice(0, 32)}...`;
+    }
+
     try {
-      const generatedUrl = await generateFreeImage({
-        prompt: `${userInput}, cinematic 8k quality, masterpiece, vivid lighting`,
+      // Step A: Ensure reference image is an accessible HTTP URL (upload if base64)
+      let resolvedRefUrl = currentCanvasUrlRef.current || referenceImage;
+      if (resolvedRefUrl && resolvedRefUrl.startsWith("data:")) {
+        try {
+          const res = await fetch(resolvedRefUrl);
+          const blob = await res.blob();
+          const file = new File([blob], "remix_reference.png", { type: blob.type || "image/png" });
+          const upRes = await uploadReferencePhoto(file);
+          if (upRes?.url) {
+            resolvedRefUrl = upRes.url;
+            currentCanvasUrlRef.current = upRes.url;
+          }
+        } catch (upErr) {
+          console.warn("Base64 reference upload notice:", upErr);
+        }
+      }
+
+      setProgressMsg(`Analyzing visual anchor at ${Math.round(styleWeight * 100)}% weight...`);
+
+      // Step B: Dispatch task to FastAPI backend with reference image and style weight
+      const dispatchRes = await dispatchGeneration({
+        prompt: promptToSend,
+        reference_image_url: resolvedRefUrl,
+        style_weight: styleWeight,
         model: "flux",
-        aspectRatio: "1:1",
       });
 
-      const cleanUrl = await stripWatermark(generatedUrl);
-      setCurrentImgUrl(cleanUrl);
+      const taskId = dispatchRes.task_id;
+      let finalUrl = dispatchRes.direct_image_url;
 
-      await saveGeneration({
-        prompt: `Remix: ${userInput}`,
+      // Step C: Stream realtime generation progress
+      await new Promise<void>((resolve) => {
+        const unsubscribe = subscribeGenerationProgress(
+          taskId,
+          (event) => {
+            if (event.message) setProgressMsg(event.message);
+            if (event.output_url) finalUrl = event.output_url;
+          },
+          (outputUrl) => {
+            if (outputUrl) finalUrl = outputUrl;
+            unsubscribe();
+            setTimeout(resolve, 300);
+          },
+          () => {
+            unsubscribe();
+            resolve();
+          }
+        );
+
+        setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 30000);
+      });
+
+      // Step D: Fallback to direct client generation if needed
+      if (!finalUrl) {
+        finalUrl = await generateFreeImage({
+          prompt: promptToSend,
+          model: "flux",
+          aspectRatio: "1:1",
+          referenceImage: resolvedRefUrl && resolvedRefUrl.startsWith("http") ? resolvedRefUrl : undefined,
+        });
+      }
+
+      const cleanUrl = await stripWatermark(finalUrl);
+      setCurrentImgUrl(cleanUrl);
+      currentCanvasUrlRef.current = cleanUrl;
+
+      // Step E: Save or update single entity for this remix chat session in Recent Generations
+      const saved = await saveGeneration({
+        prompt: sessionTitle.current,
         image_url: cleanUrl,
         model: "Flux Schnell (Remix)",
         aspect_ratio: "1:1",
         user_id: user?.id,
         user_email: profile.email,
-      }, userKey);
+        type: "REMIX",
+      }, userKey, remixSessionId.current);
+
+      if (saved?.id) {
+        remixSessionId.current = saved.id;
+      }
 
       const aiReply: ChatMsg = {
         role: "ai",
-        content: `Remix generated with FLUX.1 engine (Style Anchor: ${Math.round(styleWeight * 100)}%). New variation saved to Supabase DB.`,
+        content: `Remix generated with FLUX.1 engine (Anchor Weight: ${Math.round(styleWeight * 100)}%). Variation preserved in this session.`,
         time: "Just now",
       };
       setMessages((p) => [...p, aiReply]);
-    } catch {
-      // Keep reference as fallback
+    } catch (err: any) {
+      console.warn("Remix generation error:", err);
+      const aiReply: ChatMsg = {
+        role: "ai",
+        content: "Remix synthesis failed. Please try a different prompt or check connectivity.",
+        time: "Just now",
+      };
+      setMessages((p) => [...p, aiReply]);
     } finally {
       setGenerating(false);
+      setProgressMsg("Synthesizing Image Remix...");
     }
   }
 
@@ -356,10 +483,10 @@ export default function RemixWorkspace({
                 }}
               />
               <p style={{ color: "#00d4ff", fontSize: "15px", fontWeight: 700, margin: "0 0 6px" }}>
-                Synthesizing Image Remix...
+                {progressMsg}
               </p>
               <p style={{ color: "#94a3b8", fontSize: "12px", margin: 0 }}>
-                Anchor preservation active · High fidelity diffusion
+                Anchor preservation active ({Math.round(styleWeight * 100)}%) · High fidelity diffusion
               </p>
             </div>
           ) : (
@@ -376,7 +503,7 @@ export default function RemixWorkspace({
               }}
             >
               <img
-                src={currentImgUrl || "/sample-art.jpg"}
+                src={(viewingOriginal ? referenceImage : currentImgUrl) || "/sample-art.jpg"}
                 alt="Remix artwork"
                 style={{
                   maxWidth: "100%",
@@ -387,6 +514,8 @@ export default function RemixWorkspace({
                   marginBottom: "-40px",
                 }}
               />
+
+              {/* Status Badge */}
               <div
                 style={{
                   position: "absolute",
@@ -396,9 +525,9 @@ export default function RemixWorkspace({
                   borderRadius: "6px",
                   background: "rgba(0,0,0,0.8)",
                   backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(0,212,255,0.3)",
+                  border: viewingOriginal ? "1px solid rgba(168,85,247,0.4)" : "1px solid rgba(0,212,255,0.3)",
                   fontSize: "11px",
-                  color: "#00d4ff",
+                  color: viewingOriginal ? "#c084fc" : "#00d4ff",
                   fontWeight: 600,
                   display: "flex",
                   alignItems: "center",
@@ -406,8 +535,63 @@ export default function RemixWorkspace({
                 }}
               >
                 <Layers size={11} />
-                <span>Active Remix Canvas</span>
+                <span>{viewingOriginal ? "Original Reference Artwork" : "Active Remix Canvas"}</span>
               </div>
+
+              {/* Switch / Compare Toggle between Original and Remix */}
+              {currentImgUrl && currentImgUrl !== referenceImage && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "14px",
+                    right: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    background: "rgba(10,14,24,0.85)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: "8px",
+                    padding: "2px",
+                    gap: "2px",
+                    zIndex: 10,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setViewingOriginal(false)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      background: !viewingOriginal ? "rgba(0,212,255,0.2)" : "transparent",
+                      color: !viewingOriginal ? "#00d4ff" : "#94a3b8",
+                      border: "none",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    Remix Result
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewingOriginal(true)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      background: viewingOriginal ? "rgba(168,85,247,0.25)" : "transparent",
+                      color: viewingOriginal ? "#c084fc" : "#94a3b8",
+                      border: "none",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    Original Reference
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -565,7 +749,10 @@ export default function RemixWorkspace({
                 <button
                   key={mod}
                   type="button"
-                  onClick={() => setPromptMod((prev) => `${prev}, ${mod}`)}
+                  onClick={() => {
+                    const cleanMod = mod.replace(/^\+\s*/, "");
+                    setPromptMod((prev) => (prev.trim() ? `${prev.trim()}, ${cleanMod}` : cleanMod));
+                  }}
                   style={{
                     padding: "4px 10px",
                     borderRadius: "6px",
@@ -604,7 +791,11 @@ export default function RemixWorkspace({
                   handleSend();
                 }
               }}
-              placeholder="Describe what to change in the reference image..."
+              placeholder={
+                basePromptRef.current
+                  ? "Describe what to modify (e.g. Add a person behind, change lighting, anime style)..."
+                  : "Describe what to change in the reference image..."
+              }
               style={{
                 width: "100%",
                 background: "#161d2b",

@@ -58,6 +58,8 @@ export interface DispatchGenerationParams {
   structured_metadata?: StructuredPromptMetadata | null;
   character_id?: string | null;
   face_reference_urls?: string[] | null;
+  reference_image_url?: string | null;
+  style_weight?: number;
   width?: number;
   height?: number;
   seed?: number;
@@ -92,6 +94,8 @@ export async function dispatchGeneration(
           structured_metadata: params.structured_metadata ?? null,
           character_id: params.character_id ?? null,
           face_reference_urls: params.face_reference_urls ?? null,
+          reference_image_url: params.reference_image_url ?? null,
+          style_weight: params.style_weight ?? 0.55,
           width: params.width ?? 1024,
           height: params.height ?? 1024,
           seed: params.seed ?? Math.floor(Math.random() * 1_000_000),
@@ -114,11 +118,15 @@ export async function dispatchGeneration(
   const fallbackTaskId = `task_${Math.random().toString(36).substring(2, 10)}`;
   const encoded = encodeURIComponent(params.prompt);
   const pollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
+  const refImageParam =
+    params.reference_image_url && params.reference_image_url.startsWith("http")
+      ? `&image=${encodeURIComponent(params.reference_image_url)}`
+      : "";
   const fallbackUrl = `https://gen.pollinations.ai/image/${encoded}?model=flux&width=${
     params.width || 1024
   }&height=${params.height || 1024}&seed=${
     params.seed || 42
-  }&nologo=true&key=${pollinationsKey}`;
+  }&nologo=true${refImageParam}&key=${pollinationsKey}`;
 
   return {
     task_id: fallbackTaskId,

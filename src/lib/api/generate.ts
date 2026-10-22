@@ -33,7 +33,7 @@ export async function generateFreeImage({
   const apiKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
   const keyParam = apiKey ? `&key=${apiKey}` : "";
 
-  let url = `https://gen.pollinations.ai/image/${encodedPrompt}?model=${model}&width=${width}&height=${height}&seed=${finalSeed}&nologo=true${keyParam}`;
+  let url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${model}&width=${width}&height=${height}&seed=${finalSeed}&nologo=true${keyParam}`;
   if (referenceImage && referenceImage.startsWith("http")) {
     url += `&image=${encodeURIComponent(referenceImage)}`;
   }
