@@ -40,6 +40,25 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/auth/signup",
+        destination: "/auth/register",
+        permanent: true,
+      },
+      {
+        source: "/signup",
+        destination: "/auth/register",
+        permanent: true,
+      },
+      {
+        source: "/login",
+        destination: "/auth/login",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

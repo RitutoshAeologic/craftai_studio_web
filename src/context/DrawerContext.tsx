@@ -21,11 +21,13 @@ export function DrawerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("craftai_drawer_open");
-      if (saved !== null) {
-        setIsOpen(saved === "true");
-      } else if (window.innerWidth < 1024) {
-        setIsOpen(false);
-      }
+      queueMicrotask(() => {
+        if (saved !== null) {
+          setIsOpen(saved === "true");
+        } else if (window.innerWidth < 1024) {
+          setIsOpen(false);
+        }
+      });
     } catch {
       // Ignore
     }

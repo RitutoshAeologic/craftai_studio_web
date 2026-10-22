@@ -42,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${inter.variable} ${outfit.variable} h-full`}
       style={{ colorScheme: "dark" }}
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <body

@@ -90,9 +90,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.name) {
-          setProfile({
-            ...parsed,
-            initials: computeInitials(parsed.name),
+          queueMicrotask(() => {
+            setProfile({
+              ...parsed,
+              initials: computeInitials(parsed.name),
+            });
           });
         }
       }
@@ -102,7 +104,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const supabase = createClient();
     if (!supabase) {
-      setLoading(false);
+      queueMicrotask(() => setLoading(false));
       return;
     }
 

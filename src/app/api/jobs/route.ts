@@ -21,13 +21,22 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) {
       console.warn("[Jobs GET Error]:", error);
+      // If it's a clock-skew or JWT error (e.g. PGRST303) or transient connection issue,
+      // return a safe empty jobs list with HTTP 200 so client falls back cleanly to local cache
+      const isTransientOrJwt =
+        error.code === "PGRST303" ||
+        error.message?.includes("JWT") ||
+        error.message?.includes("future");
+      if (isTransientOrJwt) {
+        return NextResponse.json({ jobs: [], warning: error.message });
+      }
       return NextResponse.json({ error: error.message, jobs: [] }, { status: 500 });
     }
 
     return NextResponse.json({ jobs: data || [] });
   } catch (err: any) {
     console.error("[Jobs GET Handler Error]:", err);
-    return NextResponse.json({ error: err?.message, jobs: [] }, { status: 500 });
+    return NextResponse.json({ jobs: [], warning: err?.message || "Failed to fetch jobs" });
   }
 }
 
