@@ -10,7 +10,7 @@ import {
   LayoutGrid,
   ArrowRight,
 } from "lucide-react";
-import { fetchGenerations, fetchArtworks, type Generation, type Artwork } from "@/lib/supabase/db";
+import { fetchGenerations, fetchArtworks, isCreativeToolGeneration, type Generation, type Artwork } from "@/lib/supabase/db";
 import RemixWorkspace from "./[id]/RemixWorkspace";
 
 function RemixLaunchpadContent() {
@@ -35,7 +35,11 @@ function RemixLaunchpadContent() {
 
   useEffect(() => {
     fetchGenerations().then((gens) => {
-      setRecentGens(gens.filter((g) => g.image_url && g.image_url.startsWith("http")).slice(0, 8));
+      setRecentGens(
+        gens
+          .filter((g) => !isCreativeToolGeneration(g) && g.image_url && g.image_url.startsWith("http"))
+          .slice(0, 8)
+      );
     });
     fetchArtworks().then((arts) => {
       setArtworks(arts.slice(0, 8));

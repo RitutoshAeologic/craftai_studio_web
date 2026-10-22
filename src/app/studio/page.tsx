@@ -145,32 +145,44 @@ function StudioContent() {
   useEffect(() => {
     if (querySessionId) activeSessionId.current = querySessionId;
     if (queryRemixId) remixedFromPromptId.current = queryRemixId;
-  }, [querySessionId, queryRemixId]);
+    if (queryPrompt) {
+      setPromptRecipe(queryPrompt);
+      setLastGeneratedPrompt(queryPrompt);
+      if (queryImage) {
+        setCurrentImage(queryImage);
+      }
+      setChatMessages([
+        {
+          id: `msg-load-${Date.now()}`,
+          role: "assistant",
+          content: `Loaded concept: "${queryPrompt.length > 60 ? queryPrompt.slice(0, 60) + '...' : queryPrompt}". How would you like to refine it?`,
+          timestamp: "Just now",
+          status: "completed",
+          suggestedChips: ["Make it cinematic", "Photorealistic 8K", "Add golden hour", "Cyberpunk neon street"],
+        },
+      ]);
+    }
+  }, [queryPrompt, querySessionId, queryRemixId, queryImage]);
 
   // Messages in Chat Copilot
   const [chatMessages, setChatMessages] = useState<StudioChatMessage[]>(() => {
     const msgs: StudioChatMessage[] = [];
     if (queryPrompt) {
       msgs.push({
-        id: "msg-init-user",
-        role: "user",
-        content: queryPrompt,
-        timestamp: "Just now",
-      });
-      msgs.push({
         id: "msg-init-ai",
         role: "assistant",
         content: autoGen === "true"
           ? `Synthesizing your concept with ${queryEngine || "FLUX.1 Schnell"}...`
-          : `Loaded prompt. You can enhance it with Gemini, converse with the Copilot, or lock your face likeness.`,
+          : `Concept loaded into workspace. You can enhance it with Gemini, apply style boosters, or instruct Copilot to refine specific details.`,
         timestamp: "Just now",
         status: autoGen === "true" ? "synthesizing" : "completed",
+        suggestedChips: ["Make it cinematic", "Photorealistic 8K", "Add golden hour", "Cyberpunk neon street"],
       });
     } else {
       msgs.push({
         id: "msg-welcome",
         role: "assistant",
-        content: "Welcome to CraftAI Studio! Enter your concept below, enhance with Gemini, or speak to the Chat Copilot to refine anytime.",
+        content: "Welcome to CraftAI Studio! Enter your concept below, apply style boosters, or enhance with Gemini to craft artwork.",
         timestamp: "Just now",
         status: "completed",
         suggestedChips: ["Make it cinematic", "Add golden hour", "Cyberpunk neon street"],
@@ -372,10 +384,11 @@ function StudioContent() {
           {
             id: `enhance-${Date.now()}`,
             role: "assistant",
-            content: `✨ Master formula armed with ${res.model_used || llmConfig.model_mappings[selectedEngine] || selectedEngine}. Visual Director breakdown generated.`,
+            content: `✨ Enhanced prompt with ${res.model_used || llmConfig.model_mappings[selectedEngine] || selectedEngine}. Visual director details applied.`,
             timestamp: "Just now",
             status: "completed",
             structuredMetadata: res.structured_metadata,
+            suggestedChips: ["Add cinematic lighting", "Make photorealistic 8K", "Add volumetric fog"],
           },
         ]);
       }
@@ -406,7 +419,7 @@ function StudioContent() {
       {
         id: aiMsgId,
         role: "assistant",
-        content: "Compiling prompt delta...",
+        content: "Compiling prompt adjustments...",
         timestamp: "Just now",
         status: "synthesizing",
       },
@@ -521,17 +534,10 @@ function StudioContent() {
     setProgressPercent(5);
     setProgressMessage("Preparing creative canvas...");
 
-    const userMsgId = `user-${Date.now()}`;
     const aiMsgId = `ai-${Date.now()}`;
 
     setChatMessages((prev) => [
       ...prev,
-      {
-        id: userMsgId,
-        role: "user",
-        content: clean,
-        timestamp: "Just now",
-      },
       {
         id: aiMsgId,
         role: "assistant",
@@ -647,6 +653,7 @@ function StudioContent() {
                 ...msg,
                 content: `Artwork generated with ${model.label}! Ready to refine or download in 4K.`,
                 status: "completed",
+                suggestedChips: ["Add cinematic lighting", "Make photorealistic 8K", "Add depth of field bokeh"],
               }
             : msg
         )
@@ -779,87 +786,21 @@ function StudioContent() {
         </div>
       )}
 
-      {/* ══ TOP CONSISTENT CHARACTER / FACE-LOCK BAR (InstantID Tier 1) ══ */}
-      <div
-        style={{
-          background: "#0d0d14",
-          borderBottom: `1px solid ${S.panelBorder}`,
-          padding: "8px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "10px",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <Camera size={14} style={{ color: isFaceLockActive ? S.success : S.textSecondary }} />
-            <span style={{ fontSize: "11px", fontWeight: 700, color: S.textPrimary, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              InstantID Face-Lock
-            </span>
-          </div>
-
-          {/* 3 Face Reference Angle Slots */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            {(["front", "angle45", "profile"] as const).map((angle) => {
-              const label = angle === "front" ? "Front" : angle === "angle45" ? "45°" : "Profile";
-              const photo = faceAngleSlots[angle];
-              return (
-                <label
-                  key={angle}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    padding: "3px 8px",
-                    borderRadius: "6px",
-                    background: photo ? "rgba(16, 185, 129, 0.15)" : "rgba(255,255,255,0.03)",
-                    border: photo ? "1px solid rgba(16, 185, 129, 0.4)" : `1px solid ${S.cardBorder}`,
-                    color: photo ? S.success : S.textSecondary,
-                    fontSize: "11px",
-                    cursor: isBusy ? "not-allowed" : "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  title={`Upload ${label} photo`}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={isBusy}
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) handleFaceAngleUpload(e.target.files[0], angle);
-                    }}
-                  />
-                  {photo ? <Check size={10} /> : <Plus size={10} />}
-                  <span>{label}</span>
-                </label>
-              );
-            })}
-          </div>
-
-          {isFaceLockActive && (
-            <span style={{
-              fontSize: "11px",
-              color: S.success,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              background: "rgba(16, 185, 129, 0.1)",
-              padding: "3px 8px",
-              borderRadius: "9999px",
-              border: "1px solid rgba(16, 185, 129, 0.25)",
-            }}>
-              🟢 Tier 1 Face-Lock Active • Zero Retention Privacy
-            </span>
-          )}
-        </div>
-
-        {/* Explore Creator Remix Attribution if active */}
-        {remixedFromPromptId.current && (
+      {/* ══ EXPLORE CREATOR REMIX ATTRIBUTION (if active) ══ */}
+      {remixedFromPromptId.current && (
+        <div
+          style={{
+            background: "#0d0d14",
+            borderBottom: `1px solid ${S.panelBorder}`,
+            padding: "8px 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+            gap: "10px",
+            flexShrink: 0,
+          }}
+        >
           <div style={{
             fontSize: "11px",
             color: S.primary,
@@ -874,8 +815,8 @@ function StudioContent() {
             <Sparkles size={12} />
             <span>Remix Royalty Split (40% Author Credit)</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ══ TWO COLUMN WORKSPACE ════════════════════════════════ */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
@@ -1373,25 +1314,6 @@ function StudioContent() {
                         </button>
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                        {((msg.structuredMetadata.preserved_elements && msg.structuredMetadata.preserved_elements.length > 0) ||
-                          msg.content.toLowerCase().includes("face") ||
-                          msg.content.toLowerCase().includes("preserve")) && (
-                          <span style={{
-                            fontSize: "10px",
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            background: "rgba(16, 185, 129, 0.2)",
-                            border: "1px solid rgba(16, 185, 129, 0.45)",
-                            color: "#34d399",
-                            fontWeight: 700,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "3px",
-                          }}>
-                            <Lock size={9} />
-                            🔒 Authentic Face Structure Locked
-                          </span>
-                        )}
                         {msg.structuredMetadata.subject && (
                           <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(99,102,241,0.12)", color: "#c7d2fe" }}>
                             👤 {msg.structuredMetadata.subject.length > 28 ? msg.structuredMetadata.subject.slice(0, 28) + "..." : msg.structuredMetadata.subject}
@@ -1634,27 +1556,6 @@ function StudioContent() {
                     </button>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {((structuredMetadata.preserved_elements && structuredMetadata.preserved_elements.length > 0) ||
-                      promptRecipe.toLowerCase().includes("face") ||
-                      promptRecipe.toLowerCase().includes("preserve")) && (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          padding: "2px 7px",
-                          borderRadius: "4px",
-                          background: "rgba(16, 185, 129, 0.18)",
-                          border: "1px solid rgba(16, 185, 129, 0.45)",
-                          color: "#34d399",
-                          fontSize: "10px",
-                          fontWeight: 700,
-                        }}
-                      >
-                        <Lock size={10} />
-                        🔒 Authentic Face Structure Locked
-                      </span>
-                    )}
                     {structuredMetadata.lighting && (
                       <span
                         style={{

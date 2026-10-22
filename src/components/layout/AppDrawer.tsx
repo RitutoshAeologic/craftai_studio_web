@@ -20,7 +20,7 @@ import {
   Coins,
   Sliders,
 } from "lucide-react";
-import { fetchGenerations, deleteGeneration, fetchWallet, type Generation } from "@/lib/supabase/db";
+import { fetchGenerations, deleteGeneration, fetchWallet, isCreativeToolGeneration, type Generation } from "@/lib/supabase/db";
 
 export default function AppDrawer() {
   const { isOpen, toggleDrawer, setIsOpen } = useDrawer();
@@ -31,6 +31,8 @@ export default function AppDrawer() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [walletCredits, setWalletCredits] = useState(100);
+
+  const recentGenerations = generations.filter((g) => !isCreativeToolGeneration(g));
 
   useEffect(() => {
     const handleResize = () => {
@@ -327,14 +329,14 @@ export default function AppDrawer() {
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {generations.length === 0 ? (
+          {recentGenerations.length === 0 ? (
             isOpen ? (
               <div style={{ padding: "14px 10px", textAlign: "center", color: "#475569", fontSize: "12px", fontStyle: "italic" }}>
                 No recent generations
               </div>
             ) : null
           ) : (
-            generations.slice(0, 15).map((gen) => (
+            recentGenerations.slice(0, 15).map((gen) => (
               <div
                 key={gen.id}
                 style={{
@@ -356,7 +358,8 @@ export default function AppDrawer() {
                 <button
                   onClick={() => {
                     handleLinkClick();
-                    router.push(`/studio?prompt=${encodeURIComponent(gen.prompt)}&sessionId=${gen.id}`);
+                    const imageParam = gen.image_url ? `&imageUrl=${encodeURIComponent(gen.image_url)}` : "";
+                    router.push(`/studio?prompt=${encodeURIComponent(gen.prompt)}&sessionId=${gen.id}${imageParam}`);
                   }}
                   title={gen.prompt}
                   style={{

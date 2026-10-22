@@ -400,6 +400,53 @@ export async function fetchGenerations(userIdentifier?: string): Promise<Generat
   return cachedGens;
 }
 
+/**
+ * Detects whether a generation was produced by Creative Tools (cutout, background, expand, upscale, poster, product, etc.)
+ */
+export function isCreativeToolGeneration(gen: Generation): boolean {
+  if (!gen) return false;
+  const type = (gen.type || "").toLowerCase();
+  if (
+    type.startsWith("tool") ||
+    type.includes("cutout") ||
+    type.includes("remove_bg") ||
+    type.includes("remove-bg") ||
+    type.includes("ai_background") ||
+    type.includes("ai-background") ||
+    type.includes("ai_expand") ||
+    type.includes("ai-expand") ||
+    type.includes("outpaint") ||
+    type.includes("upscale") ||
+    type.includes("product") ||
+    type.includes("poster")
+  ) {
+    return true;
+  }
+  const model = (gen.model || "").toLowerCase();
+  if (
+    model.includes("tool engine") ||
+    model.startsWith("tool_") ||
+    model.startsWith("tool-")
+  ) {
+    return true;
+  }
+  const prompt = (gen.prompt || "").toLowerCase();
+  if (
+    prompt.startsWith("ai expand") ||
+    prompt.startsWith("ai background") ||
+    prompt.startsWith("background cutout") ||
+    prompt.startsWith("ai 4k upscale") ||
+    prompt.startsWith("product detail") ||
+    prompt.startsWith("marketing poster") ||
+    prompt.startsWith("ai tool edit") ||
+    prompt.includes("rmbg-") ||
+    prompt.includes("(rmbg")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /* ── Save or Update a Generation in DB & Cache (User Associated & Supabase Synced) ────── */
 export async function saveGeneration(
   gen: Omit<Generation, "id" | "created_at">,
