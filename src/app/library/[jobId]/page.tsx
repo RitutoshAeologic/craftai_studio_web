@@ -29,21 +29,9 @@ import {
   type Wallet,
 } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
+import { theme } from "@/lib/theme/themeGuard";
 
-const S = {
-  bg:          "#0b0b0f",
-  card:        "#121218",
-  cardBorder:  "#1e1e2a",
-  borderLight: "#2e2e3e",
-  cyan:        "#00d4ff",
-  primary:     "#6366f1",
-  primaryDark: "#4f46e5",
-  textPrimary: "#ffffff",
-  textSecondary: "#94a3b8",
-  textMuted:   "#64748b",
-  success:     "#10b981",
-  purple:      "#a855f7",
-};
+const S = theme.colors;
 
 export default function JobDetailPage() {
   const router = useRouter();

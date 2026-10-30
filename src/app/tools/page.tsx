@@ -18,6 +18,7 @@ import {
   Sliders,
   Split,
   Eye,
+  Trash2,
   RefreshCw,
   Sun,
   Camera,
@@ -28,30 +29,23 @@ import {
   Box,
   FileText,
   Image as ImageIcon,
+  Palette,
 } from "lucide-react";
 import { RelightPresetId } from "@/lib/utils/image-processing";
 import { useUser } from "@/context/UserContext";
 import { toolsApi, type ToolHistoryItem, type BaseToolResponse } from "@/lib/api/toolsApi";
 import { ToolHistoryModal } from "@/components/tools/ToolHistoryModal";
+import { MagicObjectEraser } from "@/components/tools/MagicObjectEraser";
+import { PhotoColorizer } from "@/components/tools/PhotoColorizer";
 import { saveGeneration } from "@/lib/supabase/db";
+import { theme } from "@/lib/theme/themeGuard";
 
-const S = {
-  bg:          "#0b0b0f",
-  card:        "#121218",
-  cardBorder:  "#1e1e2a",
-  borderLight: "#2e2e3e",
-  cyan:        "#00d4ff",
-  primary:     "#6366f1",
-  primaryDark: "#4f46e5",
-  textPrimary: "#ffffff",
-  textSecondary: "#94a3b8",
-  textMuted:   "#64748b",
-  success:     "#10b981",
-  purple:      "#a855f7",
-};
+const S = theme.colors;
 
 type ToolTab =
   | "cutout"
+  | "object_eraser"
+  | "colorizer"
   | "ai_background"
   | "ai_expand"
   | "upscale"
@@ -230,6 +224,8 @@ function ToolsContent() {
   const { user, profile } = useUser();
 
   const parseInitialTab = (): ToolTab => {
+    if (queryAction === "object_eraser" || queryAction === "erase" || queryAction === "remove-object") return "object_eraser";
+    if (queryAction === "colorizer" || queryAction === "colorize") return "colorizer";
     if (queryAction === "ai_background" || queryAction === "background") return "ai_background";
     if (queryAction === "ai_expand" || queryAction === "expand") return "ai_expand";
     if (queryAction === "upscale") return "upscale";
@@ -241,12 +237,49 @@ function ToolsContent() {
 
   const [activeTab, setActiveTab] = useState<ToolTab>(parseInitialTab);
 
-  // Source & Result Image States
-  const [sourceImage, setSourceImage] = useState<string>(
-    queryImage || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600"
-  );
-  const [cutoutOutput, setCutoutOutput] = useState<string | null>(null);
-  const [toolOutput, setToolOutput] = useState<string | null>(null);
+  // Source & Result Image States (Independent per tool tab so uploaded images do not bleed across tools)
+  const [tabImages, setTabImages] = useState<Record<ToolTab, string | null>>(() => {
+    const initialTab = parseInitialTab();
+    const map: Record<ToolTab, string | null> = {
+      cutout: null,
+      object_eraser: null,
+      colorizer: null,
+      ai_background: null,
+      ai_expand: null,
+      upscale: null,
+      product_detail: null,
+      marketing_poster: null,
+      relight: null,
+    };
+    if (queryImage) {
+      map[initialTab] = queryImage;
+    } else {
+      map.cutout = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600";
+    }
+    return map;
+  });
+
+  const [tabOutputs, setTabOutputs] = useState<Record<ToolTab, string | null>>({
+    cutout: null,
+    object_eraser: null,
+    colorizer: null,
+    ai_background: null,
+    ai_expand: null,
+    upscale: null,
+    product_detail: null,
+    marketing_poster: null,
+    relight: null,
+  });
+
+  const sourceImage = tabImages[activeTab] || "";
+  const cutoutOutput = tabOutputs.cutout;
+  const toolOutput = tabOutputs[activeTab];
+  const setCutoutOutput = (url: string | null) => {
+    setTabOutputs((prev) => ({ ...prev, cutout: url }));
+  };
+  const setToolOutput = (url: string | null) => {
+    setTabOutputs((prev) => ({ ...prev, [activeTab]: url }));
+  };
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"slider" | "result" | "original">("slider");
@@ -351,14 +384,25 @@ function ToolsContent() {
     if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setSourceImage(reader.result as string);
-      setCutoutOutput(null);
+      const dataUrl = reader.result as string;
+      setTabImages((prev) => ({ ...prev, [activeTab]: dataUrl }));
+      setTabOutputs((prev) => ({ ...prev, [activeTab]: null }));
+      if (activeTab === "cutout") setCutoutOutput(null);
       setToolOutput(null);
       setErrorMessage(null);
       setViewMode("slider");
       setSliderPos(50);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setTabImages((prev) => ({ ...prev, [activeTab]: null }));
+    setTabOutputs((prev) => ({ ...prev, [activeTab]: null }));
+    if (activeTab === "cutout") setCutoutOutput(null);
+    setToolOutput(null);
+    setErrorMessage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   // Open Tool History Modal
@@ -678,6 +722,48 @@ function ToolsContent() {
           </button>
 
           <button
+            onClick={() => { setActiveTab("object_eraser"); }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 14px",
+              borderRadius: "10px",
+              background: activeTab === "object_eraser" ? "rgba(168, 85, 247, 0.22)" : S.card,
+              border: activeTab === "object_eraser" ? `1px solid ${S.purple}` : `1px solid ${S.borderLight}`,
+              color: activeTab === "object_eraser" ? "#ffffff" : S.textSecondary,
+              fontSize: "12.5px",
+              fontWeight: activeTab === "object_eraser" ? 700 : 500,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Zap size={15} style={{ color: S.purple }} />
+            <span>Magic Eraser (Free)</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab("colorizer"); }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 14px",
+              borderRadius: "10px",
+              background: activeTab === "colorizer" ? "rgba(99, 102, 241, 0.22)" : S.card,
+              border: activeTab === "colorizer" ? `1px solid ${S.primary}` : `1px solid ${S.borderLight}`,
+              color: activeTab === "colorizer" ? "#ffffff" : S.textSecondary,
+              fontSize: "12.5px",
+              fontWeight: activeTab === "colorizer" ? 700 : 500,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Palette size={15} style={{ color: S.primary }} />
+            <span>Vintage Colorizer (Free)</span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab("ai_background"); setViewMode("slider"); setSliderPos(50); }}
             style={{
               display: "flex",
@@ -837,14 +923,33 @@ function ToolsContent() {
         )}
 
         {/* ── Main Workspace Grid ─────────────────────────────── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-            gap: "24px",
-            alignItems: "start",
-          }}
-        >
+        {activeTab === "object_eraser" ? (
+          <MagicObjectEraser
+            initialImageUrl={tabImages.object_eraser || undefined}
+            onImageChange={(url) => setTabImages((prev) => ({ ...prev, object_eraser: url }))}
+            onSavedToLibrary={(url) => {
+              setTabOutputs((prev) => ({ ...prev, object_eraser: url }));
+              setToolOutput(url);
+            }}
+          />
+        ) : activeTab === "colorizer" ? (
+          <PhotoColorizer
+            initialImageUrl={tabImages.colorizer || undefined}
+            onImageChange={(url) => setTabImages((prev) => ({ ...prev, colorizer: url }))}
+            onSavedToLibrary={(url) => {
+              setTabOutputs((prev) => ({ ...prev, colorizer: url }));
+              setToolOutput(url);
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+              gap: "24px",
+              alignItems: "start",
+            }}
+          >
           {/* Left Canvas (Before / After Comparison or Preview) */}
           <div
             style={{
@@ -867,7 +972,7 @@ function ToolsContent() {
                 marginBottom: "12px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span
                   style={{
                     fontSize: "11px",
@@ -881,6 +986,53 @@ function ToolsContent() {
                 >
                   {activeTab.replace(/_/g, " ")}
                 </span>
+
+                {sourceImage && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: `1px solid ${S.borderLight}`,
+                        color: S.textPrimary,
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                      title="Replace image for this tool"
+                    >
+                      <Upload size={11} style={{ color: S.primary }} />
+                      <span>Replace</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        background: "rgba(239, 68, 68, 0.08)",
+                        border: "1px solid rgba(239, 68, 68, 0.25)",
+                        color: "#f87171",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                      title="Remove image from this tool"
+                    >
+                      <Trash2 size={11} />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Toggle Buttons: Split Slider vs Result Only */}
@@ -938,10 +1090,10 @@ function ToolsContent() {
             {/* Canvas Display Container */}
             <div
               ref={containerRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
+              onPointerDown={sourceImage ? handlePointerDown : undefined}
+              onPointerMove={sourceImage ? handlePointerMove : undefined}
+              onPointerUp={sourceImage ? handlePointerUp : undefined}
+              onPointerCancel={sourceImage ? handlePointerUp : undefined}
               style={{
                 position: "relative",
                 width: "100%",
@@ -955,10 +1107,73 @@ function ToolsContent() {
                 boxShadow: "0 12px 36px rgba(0,0,0,0.7)",
                 userSelect: "none",
                 touchAction: "none",
-                cursor: viewMode === "slider" ? "ew-resize" : "default",
+                cursor: !sourceImage ? "default" : viewMode === "slider" ? "ew-resize" : "default",
               }}
             >
-              {/* Image Rendering Logic */}
+              {!sourceImage ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "36px 24px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    border: "2px dashed rgba(255, 255, 255, 0.12)",
+                    borderRadius: "14px",
+                    background: "rgba(255, 255, 255, 0.02)",
+                    transition: "all 0.2s ease",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "16px",
+                      background: "rgba(99, 102, 241, 0.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: S.primary,
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <Upload size={28} />
+                  </div>
+                  <p style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: 700, color: S.textPrimary }}>
+                    Upload Image to Start
+                  </p>
+                  <p style={{ margin: "0 0 16px", fontSize: "13px", color: S.textSecondary, maxWidth: "340px", lineHeight: 1.5 }}>
+                    Drag & drop an image here or click to browse. Supports high-resolution PNG, JPG, or WebP.
+                  </p>
+                  <span
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "8px",
+                      background: S.primary,
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      boxShadow: `0 0 16px ${S.primaryGlow}`,
+                    }}
+                  >
+                    Choose Image
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* Image Rendering Logic */}
               {activeTab === "relight" ? (
                 /* Optical Relight View */
                 <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -968,35 +1183,36 @@ function ToolsContent() {
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
                   {viewMode === "slider" ? (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        width: `${sliderPos}%`,
-                        overflow: "hidden",
-                        borderRight: "2px solid #f59e0b",
-                      }}
-                    >
-                      <img
-                        src={sourceImage}
-                        alt="Relit"
+                    <>
+                      <div
                         style={{
-                          width: containerRef.current ? `${containerRef.current.clientWidth}px` : "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          filter: activePresetObj?.filter,
+                          position: "absolute",
+                          inset: 0,
+                          clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          WebkitClipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          pointerEvents: "none",
                         }}
-                      />
-                      <OpticalLightingOverlay preset={selectedRelightPreset} intensity={relightIntensity / 100} />
-                    </div>
+                      >
+                        <img
+                          src={sourceImage}
+                          alt="Relit"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            filter: activePresetObj?.filter,
+                            display: "block",
+                          }}
+                        />
+                        <OpticalLightingOverlay preset={selectedRelightPreset} intensity={relightIntensity / 100} />
+                      </div>
+                    </>
                   ) : (
                     <div style={{ position: "absolute", inset: 0 }}>
                       <img
                         src={sourceImage}
                         alt="Relit"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", filter: activePresetObj?.filter }}
+                        style={{ width: "100%", height: "100%", objectFit: "contain", filter: activePresetObj?.filter }}
                       />
                       <OpticalLightingOverlay preset={selectedRelightPreset} intensity={relightIntensity / 100} />
                     </div>
@@ -1004,7 +1220,7 @@ function ToolsContent() {
                 </div>
               ) : activeTab === "cutout" && cutoutOutput ? (
                 /* Cutout View */
-                <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {viewMode === "result" ? (
                     <>
                       <div
@@ -1024,73 +1240,121 @@ function ToolsContent() {
                     </>
                   ) : (
                     <>
+                      {/* Layer 1: Clean Transparent Cutout Result (Bottom layer with checkerboard pattern) */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          backgroundImage: `linear-gradient(45deg, #181824 25%, transparent 25%), linear-gradient(-45deg, #181824 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #181824 75%), linear-gradient(-45deg, transparent 75%, #181824 75%)`,
+                          backgroundSize: "20px 20px",
+                          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+                        }}
+                      />
+                      <img
+                        src={cutoutOutput}
+                        alt="Cutout After"
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                          pointerEvents: "none",
+                        }}
+                      />
+
+                      {/* Layer 2: Original Before (Top layer clipped via clip-path for exact 1:1 alignment) */}
                       <img
                         src={sourceImage}
-                        alt="Before"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        alt="Original Before"
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                          clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          WebkitClipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          pointerEvents: "none",
+                        }}
                       />
+
+                      {/* Divider line */}
                       <div
                         style={{
                           position: "absolute",
                           top: 0,
                           bottom: 0,
-                          left: 0,
-                          width: `${sliderPos}%`,
-                          overflow: "hidden",
-                          borderRight: `2px solid ${S.purple}`,
-                          background: "#181824",
+                          left: `${sliderPos}%`,
+                          width: "2px",
+                          background: S.purple,
+                          boxShadow: "0 0 10px rgba(168, 85, 247, 0.8)",
+                          pointerEvents: "none",
+                          transform: "translateX(-50%)",
                         }}
-                      >
-                        <img
-                          src={cutoutOutput}
-                          alt="After Cutout"
-                          style={{
-                            width: containerRef.current ? `${containerRef.current.clientWidth}px` : "100%",
-                            height: "100%",
-                            objectFit: "contain",
-                          }}
-                        />
-                      </div>
+                      />
                     </>
                   )}
                 </div>
               ) : toolOutput ? (
                 /* Generalized AI Output (AI Backgrounds, Expand, Upscale, Product Detail, Poster) */
-                <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {viewMode === "result" ? (
                     <img
                       src={toolOutput}
                       alt="AI Tool Result"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
                     />
                   ) : (
                     <>
+                      {/* Layer 1: Tool Output Result (Bottom layer) */}
+                      <img
+                        src={toolOutput}
+                        alt="Processed After"
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                          pointerEvents: "none",
+                        }}
+                      />
+
+                      {/* Layer 2: Original Before (Top layer clipped via clip-path for exact 1:1 alignment) */}
                       <img
                         src={sourceImage}
                         alt="Original Before"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                          clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          WebkitClipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          pointerEvents: "none",
+                        }}
                       />
+
+                      {/* Divider line */}
                       <div
                         style={{
                           position: "absolute",
                           top: 0,
                           bottom: 0,
-                          left: 0,
-                          width: `${sliderPos}%`,
-                          overflow: "hidden",
-                          borderRight: `2px solid ${S.cyan}`,
+                          left: `${sliderPos}%`,
+                          width: "2px",
+                          background: S.cyan,
+                          boxShadow: "0 0 10px rgba(6, 182, 212, 0.8)",
+                          pointerEvents: "none",
+                          transform: "translateX(-50%)",
                         }}
-                      >
-                        <img
-                          src={toolOutput}
-                          alt="Processed After"
-                          style={{
-                            width: containerRef.current ? `${containerRef.current.clientWidth}px` : "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </div>
+                      />
                     </>
                   )}
                 </div>
@@ -1132,56 +1396,64 @@ function ToolsContent() {
                   </div>
                 </div>
               )}
-            </div>
+            </>
+          )}
+        </div>
 
-            {/* Bottom Actions: ⚡ Remix in Lab, Download & Upload */}
+            {/* Bottom Actions: ⚡ Remix in Lab, Download, Replace & Remove */}
             <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "16px", flexWrap: "wrap" }}>
-              <Link
-                href={`/remix?anchorImageUrl=${encodeURIComponent(currentOutput || sourceImage)}&initialPrompt=${encodeURIComponent(remixPromptTitle)}`}
-                style={{
-                  flex: 1,
-                  minWidth: "170px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  padding: "10px 16px",
-                  borderRadius: "10px",
-                  background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)",
-                  border: "1px solid rgba(99, 102, 241, 0.5)",
-                  color: "#ffffff",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  boxShadow: "0 0 16px rgba(99, 102, 241, 0.25)",
-                }}
-              >
-                <Zap size={14} style={{ color: "#38bdf8" }} />
-                <span>⚡ Remix in Lab (Chat)</span>
-              </Link>
+              {sourceImage && (
+                <Link
+                  href={`/remix?anchorImageUrl=${encodeURIComponent(currentOutput || sourceImage)}&initialPrompt=${encodeURIComponent(remixPromptTitle)}`}
+                  style={{
+                    flex: 1,
+                    minWidth: "170px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    padding: "10px 16px",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)",
+                    border: "1px solid rgba(99, 102, 241, 0.5)",
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    boxShadow: "0 0 16px rgba(99, 102, 241, 0.25)",
+                  }}
+                >
+                  <Zap size={14} style={{ color: "#38bdf8" }} />
+                  <span>⚡ Remix in Lab (Chat)</span>
+                </Link>
+              )}
+
+              {sourceImage && (
+                <button
+                  type="button"
+                  onClick={() => triggerDownload(currentOutput || sourceImage)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "10px 16px",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: `1px solid ${S.borderLight}`,
+                    color: S.textPrimary,
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Download size={14} />
+                  <span>Download</span>
+                </button>
+              )}
 
               <button
-                onClick={() => triggerDownload(currentOutput || sourceImage)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  padding: "10px 16px",
-                  borderRadius: "10px",
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: `1px solid ${S.borderLight}`,
-                  color: S.textPrimary,
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <Download size={14} />
-                <span>Download</span>
-              </button>
-
-              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   display: "flex",
@@ -1190,16 +1462,44 @@ function ToolsContent() {
                   gap: "6px",
                   padding: "10px 14px",
                   borderRadius: "10px",
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: `1px solid ${S.borderLight}`,
-                  color: S.textSecondary,
+                  background: !sourceImage ? S.primary : "rgba(255, 255, 255, 0.06)",
+                  border: !sourceImage ? "none" : `1px solid ${S.borderLight}`,
+                  color: !sourceImage ? "#ffffff" : S.textPrimary,
                   fontSize: "13px",
+                  fontWeight: 600,
                   cursor: "pointer",
+                  boxShadow: !sourceImage ? `0 0 14px ${S.primaryGlow}` : "none",
                 }}
               >
-                <Upload size={14} />
-                <span>Replace</span>
+                <Upload size={14} style={{ color: !sourceImage ? "#ffffff" : S.primary }} />
+                <span>{sourceImage ? "Replace Image" : "Upload Image"}</span>
               </button>
+
+              {sourceImage && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    background: "rgba(239, 68, 68, 0.08)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
+                    color: "#f87171",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                  title="Remove image from this tool"
+                >
+                  <Trash2 size={14} />
+                  <span>Remove</span>
+                </button>
+              )}
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1255,12 +1555,12 @@ function ToolsContent() {
                 </div>
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    background: isProcessing ? "#1e1e2a" : S.purple,
+                    background: isProcessing ? "#1e1e2a" : !sourceImage ? S.primary : S.purple,
                     border: "none",
                     color: "#ffffff",
                     fontSize: "13px",
@@ -1270,11 +1570,17 @@ function ToolsContent() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 0 20px rgba(168, 85, 247, 0.35)",
+                    boxShadow: !sourceImage ? `0 0 20px ${S.primaryGlow}` : "0 0 20px rgba(168, 85, 247, 0.35)",
                   }}
                 >
-                  <Scissors size={16} />
-                  <span>{isProcessing ? "Extracting Foreground Cutout..." : "Remove Background (Free / 0 Cr)"}</span>
+                  {!sourceImage ? <Upload size={16} /> : <Scissors size={16} />}
+                  <span>
+                    {isProcessing
+                      ? "Extracting Foreground Cutout..."
+                      : !sourceImage
+                      ? "Upload Image to Remove Background"
+                      : "Remove Background (Free / 0 Cr)"}
+                  </span>
                 </button>
               </>
             )}
@@ -1408,14 +1714,14 @@ function ToolsContent() {
                 </div>
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    background: isProcessing ? "#1e1e2a" : S.cyan,
+                    background: isProcessing ? "#1e1e2a" : !sourceImage ? S.primary : S.cyan,
                     border: "none",
-                    color: "#000000",
+                    color: !sourceImage ? "#ffffff" : "#000000",
                     fontSize: "13px",
                     fontWeight: 700,
                     cursor: isProcessing ? "not-allowed" : "pointer",
@@ -1423,13 +1729,15 @@ function ToolsContent() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 0 20px rgba(0, 212, 255, 0.3)",
+                    boxShadow: !sourceImage ? `0 0 20px ${S.primaryGlow}` : "0 0 20px rgba(0, 212, 255, 0.3)",
                   }}
                 >
-                  <Sparkles size={16} />
+                  {!sourceImage ? <Upload size={16} /> : <Sparkles size={16} />}
                   <span>
                     {isProcessing
                       ? "Synthesizing Studio Backdrop..."
+                      : !sourceImage
+                      ? "Upload Image to Generate Backdrop"
                       : `Generate Backdrop (${bgMode === "pure_white" ? "Free 0 Cr" : "10 Credits"})`}
                   </span>
                 </button>
@@ -1494,7 +1802,7 @@ function ToolsContent() {
                 </div>
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
@@ -1512,9 +1820,13 @@ function ToolsContent() {
                     boxShadow: "0 0 20px rgba(99, 102, 241, 0.35)",
                   }}
                 >
-                  <Layers size={16} />
+                  {!sourceImage ? <Upload size={16} /> : <Layers size={16} />}
                   <span>
-                    {isProcessing ? "Expanding Canvas Boundary..." : `Expand Canvas (${expandQuality === "2k" ? "14 Credits" : "10 Credits"})`}
+                    {isProcessing
+                      ? "Expanding Canvas Boundary..."
+                      : !sourceImage
+                      ? "Upload Image to Expand Canvas"
+                      : `Expand Canvas (${expandQuality === "2k" ? "14 Credits" : "10 Credits"})`}
                   </span>
                 </button>
               </>
@@ -1627,12 +1939,12 @@ function ToolsContent() {
                 )}
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    background: isProcessing ? "#1e1e2a" : S.success,
+                    background: isProcessing ? "#1e1e2a" : !sourceImage ? S.primary : S.success,
                     border: "none",
                     color: "#ffffff",
                     fontSize: "13px",
@@ -1642,11 +1954,17 @@ function ToolsContent() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 0 20px rgba(16, 185, 129, 0.25)",
+                    boxShadow: !sourceImage ? `0 0 20px ${S.primaryGlow}` : "0 0 20px rgba(16, 185, 129, 0.25)",
                   }}
                 >
-                  <Maximize2 size={16} />
-                  <span>{isProcessing ? "Synthesizing Super-Resolution..." : "Upscale Image (Free / 0 Tokens)"}</span>
+                  {!sourceImage ? <Upload size={16} /> : <Maximize2 size={16} />}
+                  <span>
+                    {isProcessing
+                      ? "Synthesizing Super-Resolution..."
+                      : !sourceImage
+                      ? "Upload Image to Upscale"
+                      : "Upscale Image (Free / 0 Tokens)"}
+                  </span>
                 </button>
               </>
             )}
@@ -1742,14 +2060,14 @@ function ToolsContent() {
                 </div>
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    background: isProcessing ? "#1e1e2a" : "#f472b6",
+                    background: isProcessing ? "#1e1e2a" : !sourceImage ? S.primary : "#f472b6",
                     border: "none",
-                    color: "#000000",
+                    color: !sourceImage ? "#ffffff" : "#000000",
                     fontSize: "13px",
                     fontWeight: 700,
                     cursor: isProcessing ? "not-allowed" : "pointer",
@@ -1757,11 +2075,17 @@ function ToolsContent() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 0 20px rgba(244, 114, 182, 0.3)",
+                    boxShadow: !sourceImage ? `0 0 20px ${S.primaryGlow}` : "0 0 20px rgba(244, 114, 182, 0.3)",
                   }}
                 >
-                  <Box size={16} />
-                  <span>{isProcessing ? "Rendering Commercial Showcase..." : "Generate Product Detail (10 Credits)"}</span>
+                  {!sourceImage ? <Upload size={16} /> : <Box size={16} />}
+                  <span>
+                    {isProcessing
+                      ? "Rendering Commercial Showcase..."
+                      : !sourceImage
+                      ? "Upload Image to Create Showcase"
+                      : "Generate Product Detail (10 Credits)"}
+                  </span>
                 </button>
               </>
             )}
@@ -1854,14 +2178,14 @@ function ToolsContent() {
                 </div>
 
                 <button
-                  onClick={handleExecuteActiveTool}
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    background: isProcessing ? "#1e1e2a" : "#fb923c",
+                    background: isProcessing ? "#1e1e2a" : !sourceImage ? S.primary : "#fb923c",
                     border: "none",
-                    color: "#000000",
+                    color: !sourceImage ? "#ffffff" : "#000000",
                     fontSize: "13px",
                     fontWeight: 700,
                     cursor: isProcessing ? "not-allowed" : "pointer",
@@ -1869,12 +2193,16 @@ function ToolsContent() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 0 20px rgba(251, 146, 60, 0.3)",
+                    boxShadow: !sourceImage ? `0 0 20px ${S.primaryGlow}` : "0 0 20px rgba(251, 146, 60, 0.3)",
                   }}
                 >
-                  <FileText size={16} />
+                  {!sourceImage ? <Upload size={16} /> : <FileText size={16} />}
                   <span>
-                    {isProcessing ? "Synthesizing Promotional Poster..." : `Generate Poster (${posterQuality === "2k" ? "14 Credits" : "10 Credits"})`}
+                    {isProcessing
+                      ? "Synthesizing Promotional Poster..."
+                      : !sourceImage
+                      ? "Upload Image to Generate Poster"
+                      : `Generate Poster (${posterQuality === "2k" ? "14 Credits" : "10 Credits"})`}
                   </span>
                 </button>
               </>
@@ -1978,10 +2306,35 @@ function ToolsContent() {
                     }}
                   />
                 </div>
+
+                {!sourceImage && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      padding: "14px",
+                      borderRadius: "10px",
+                      background: S.primary,
+                      border: "none",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      boxShadow: `0 0 20px ${S.primaryGlow}`,
+                    }}
+                  >
+                    <Upload size={16} />
+                    <span>Upload Image to Relight</span>
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Tool History Modal */}
@@ -1993,9 +2346,8 @@ function ToolsContent() {
         hasMore={hasMoreHistory}
         onLoadMore={handleLoadMoreHistory}
         onSelectImage={(url) => {
-          setSourceImage(url);
-          setToolOutput(null);
-          setCutoutOutput(null);
+          setTabImages((prev) => ({ ...prev, [activeTab]: url }));
+          setTabOutputs((prev) => ({ ...prev, [activeTab]: null }));
           setViewMode("result");
         }}
       />

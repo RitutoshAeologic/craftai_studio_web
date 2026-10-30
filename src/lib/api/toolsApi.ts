@@ -1,16 +1,20 @@
 /**
  * CraftAI Studio — Creative AI Tools API Client
- * Compatible with FastAPI v1.4.0 backend (/api/v1/prompt-engineering/tools)
- * Features flexible camelCase/snake_case property aliasing, JWT auth, and ngrok tunnel tolerance.
+ * Compatible with FastAPI v2.1.0 backend (/api/v1/prompt-engineering/tools and /api/v1/tools)
+ * Features automatic camelCase -> snake_case serialization, JWT auth, and tunnel tolerance.
  */
 
 import { createClient } from "@/lib/supabase/client";
 
-export const API_BASE =
+// Normalize base URL to always target the FastAPI Gateway (Port 8000 by default)
+const rawBase =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NEXT_PUBLIC_BACKEND_URL
-    ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1`
-    : "http://127.0.0.1:8001/api/v1");
+  "http://127.0.0.1:8000/api/v1";
+
+export const API_BASE = rawBase.replace(/\/+$/, "").endsWith("/api/v1")
+  ? rawBase.replace(/\/+$/, "")
+  : `${rawBase.replace(/\/+$/, "")}/api/v1`;
 
 let customAuthToken: string | null = null;
 
@@ -22,6 +26,7 @@ async function getRequestHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
+    "Bypass-Tunnel-Reminder": "true",
   };
 
   if (customAuthToken) {
@@ -54,6 +59,7 @@ export interface BaseToolResponse {
   cutout_url?: string;
   credits_deducted: number;
   tokens_consumed: number;
+  latency_ms?: number;
   error_message?: string;
   mode?: string;
   target_ratio?: string;
@@ -68,19 +74,26 @@ export interface BaseToolResponse {
 }
 
 export interface AiBackgroundPayload {
-  imageUrl: string;
-  mode?: "pure_white" | "smart" | "custom";
+  imageUrl?: string;
+  image_url?: string;
+  mode?: "pure_white" | "smart" | "custom" | string;
   customBackdrop?: string;
+  custom_backdrop?: string;
   aspectRatio?: "Auto" | "1:1" | "4:5" | "9:16" | "16:9" | string;
+  aspect_ratio?: string;
   quality?: "1k" | "2k";
   userId?: string;
+  user_id?: string;
 }
 
 export interface AiExpandPayload {
-  imageUrl: string;
+  imageUrl?: string;
+  image_url?: string;
   targetRatio?: "16:9" | "9:16" | "1:1" | "4:5" | "3:4" | "4:3" | "2:3" | "3:2" | string;
+  target_ratio?: string;
   quality?: "1k" | "2k";
   userId?: string;
+  user_id?: string;
 }
 
 export interface UpscaleParams {
@@ -91,7 +104,7 @@ export interface UpscaleParams {
   scale?: 2 | 4;
   scaleFactor?: 2 | 4 | number | string;
   scale_factor?: 2 | 4 | number | string;
-  mode?: "photo" | "portrait" | "anime" | "fast";
+  mode?: "photo" | "portrait" | "anime" | "fast" | string;
   userId?: string;
   user_id?: string;
 }
@@ -102,7 +115,7 @@ export interface UpscaleResponse {
   task_id: string;
   status: "completed" | "failed" | string;
   scale: number;
-  mode: "photo" | "portrait" | "anime" | "fast" | string;
+  mode: string;
   original_resolution: string;
   upscaled_resolution: string;
   output_url: string;
@@ -114,22 +127,55 @@ export interface UpscaleResponse {
 
 export interface ProductDetailPayload {
   imageUrl?: string;
+  image_url?: string;
   productName?: string;
+  product_name?: string;
   aspectRatio?: string;
+  aspect_ratio?: string;
   language?: string;
   quality?: "1k" | "2k";
   userId?: string;
+  user_id?: string;
 }
 
 export interface MarketingPosterPayload {
-  imageUrl?: string; // Optional product image to feature in hero section
+  imageUrl?: string;
+  image_url?: string;
   topic?: string;
   category?: "Beverage" | "Fashion" | "Hiring" | "Flash Sale" | "Event" | "Commercial" | "Promotion" | string;
   headline?: string;
   aspectRatio?: "4:5" | "9:16" | "1:1" | "16:9" | string;
+  aspect_ratio?: string;
   language?: string;
   quality?: "1k" | "2k";
   userId?: string;
+  user_id?: string;
+}
+
+export interface ObjectEraserPayload {
+  imageUrl?: string;
+  image_url?: string;
+  maskBase64?: string;
+  mask_base64?: string;
+  maskUrl?: string;
+  mask_url?: string;
+  userId?: string;
+  user_id?: string;
+}
+
+export interface ColorizerPayload {
+  imageUrl?: string;
+  image_url?: string;
+  saturation?: number;
+  userId?: string;
+  user_id?: string;
+}
+
+export interface VisionScanResponse {
+  extracted_prompt: string;
+  detected_style: string;
+  lighting_optics: string;
+  model_used: string;
 }
 
 export interface ToolHistoryItem {
@@ -145,15 +191,61 @@ export interface ToolHistoryItem {
   created_at: string;
 }
 
+/**
+ * Normalizes any frontend payload object to strict snake_case expected by FastAPI
+ */
+function normalizePayload(body: Record<string, any>): Record<string, any> {
+  const normalized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    // Map camelCase keys to snake_case
+    switch (key) {
+      case "imageUrl":
+        normalized["image_url"] = value;
+        break;
+      case "imageId":
+        normalized["image_id"] = value;
+        break;
+      case "customBackdrop":
+        normalized["custom_backdrop"] = value;
+        break;
+      case "aspectRatio":
+        normalized["aspect_ratio"] = value;
+        break;
+      case "targetRatio":
+        normalized["target_ratio"] = value;
+        break;
+      case "productName":
+        normalized["product_name"] = value;
+        break;
+      case "maskBase64":
+        normalized["mask_base64"] = value;
+        break;
+      case "maskUrl":
+        normalized["mask_url"] = value;
+        break;
+      case "scaleFactor":
+        normalized["scale_factor"] = value;
+        break;
+      case "userId":
+        normalized["user_id"] = value;
+        break;
+      default:
+        normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+
 async function handleToolRequest<T extends BaseToolResponse>(
   endpoint: string,
-  body: Record<string, any>
+  rawBody: Record<string, any>
 ): Promise<T> {
   const headers = await getRequestHeaders();
-  const base = API_BASE.replace(/\/+$/, "");
-  const url = base.endsWith("/api/v1")
-    ? `${base}/prompt-engineering/tools${endpoint}`
-    : `${base}/api/v1/prompt-engineering/tools${endpoint}`;
+  const body = normalizePayload(rawBody);
+
+  // Both direct /tools and /prompt-engineering/tools are supported by the backend
+  const url = `${API_BASE}/prompt-engineering/tools${endpoint}`;
 
   try {
     const res = await fetch(url, {
@@ -164,7 +256,7 @@ async function handleToolRequest<T extends BaseToolResponse>(
 
     if (res.ok) {
       const data = (await res.json()) as T;
-      // Ensure triple URL parity fallback
+      // Guarantee triple URL parity fallback
       if (!data.image_url) data.image_url = data.output_url || data.url || "";
       if (!data.output_url) data.output_url = data.image_url || data.url || "";
       if (!data.url) data.url = data.output_url || data.image_url || "";
@@ -174,7 +266,11 @@ async function handleToolRequest<T extends BaseToolResponse>(
     let errorDetail = `Tool request failed with status ${res.status}`;
     try {
       const errJson = await res.json();
-      errorDetail = errJson.message || errJson.detail || errJson.error || errorDetail;
+      errorDetail =
+        errJson.message ||
+        (Array.isArray(errJson.detail) ? errJson.detail.map((d: any) => d.msg).join(", ") : errJson.detail) ||
+        errJson.error ||
+        errorDetail;
     } catch {}
 
     throw new Error(errorDetail);
@@ -184,7 +280,7 @@ async function handleToolRequest<T extends BaseToolResponse>(
   }
 }
 
-// ── Standalone Upscale Functions matching Spec ─────────────────────────
+// ── Standalone Upscale Functions ──────────────────────────────────────
 export async function upscaleImage({
   imageUrl,
   image_url,
@@ -195,23 +291,22 @@ export async function upscaleImage({
   userId,
   user_id,
 }: UpscaleParams): Promise<UpscaleResponse> {
-  const base = API_BASE.replace(/\/+$/, "");
-  const url = base.endsWith("/api/v1")
-    ? `${base}/prompt-engineering/tools/upscale`
-    : `${base}/api/v1/prompt-engineering/tools/upscale`;
-
   const headers = await getRequestHeaders();
+  const url = `${API_BASE}/prompt-engineering/tools/upscale`;
+
+  const body = {
+    image_url: imageUrl || image_url,
+    image_id: imageId || image_id,
+    scale: scale,
+    scale_factor: scale,
+    mode: mode,
+    user_id: userId || user_id,
+  };
+
   const res = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      image_url: imageUrl || image_url,
-      image_id: imageId || image_id,
-      scale: scale,
-      scale_factor: scale,
-      mode: mode,
-      user_id: userId || user_id,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -246,8 +341,8 @@ export const toolsApi = {
     userId?: string
   ): Promise<BaseToolResponse> => {
     return handleToolRequest<BaseToolResponse>("/remove-background", {
-      imageUrl,
-      userId,
+      image_url: imageUrl,
+      user_id: userId,
     });
   },
 
@@ -258,7 +353,7 @@ export const toolsApi = {
     return handleToolRequest<BaseToolResponse>("/ai-background", payload);
   },
 
-  // 3. AI Expand (10 Cr / 14 Cr)
+  // 3. AI Expand Outpainting (10 Cr)
   expandImage: async (payload: AiExpandPayload): Promise<BaseToolResponse> => {
     return handleToolRequest<BaseToolResponse>("/ai-expand", payload);
   },
@@ -281,18 +376,77 @@ export const toolsApi = {
     return handleToolRequest<UpscaleResponse & BaseToolResponse>("/upscale", body);
   },
 
-  // 5. Product Detail (10 Cr)
+  // 5. Product Detail Showcase (10 Cr)
   generateProductDetail: async (
     payload: ProductDetailPayload
   ): Promise<BaseToolResponse> => {
     return handleToolRequest<BaseToolResponse>("/product-detail", payload);
   },
 
-  // 6. Marketing Poster (10 Cr / 14 Cr)
+  // 6. Marketing Promotional Poster (10 Cr)
   generateMarketingPoster: async (
     payload: MarketingPosterPayload
   ): Promise<BaseToolResponse> => {
     return handleToolRequest<BaseToolResponse>("/marketing-poster", payload);
+  },
+
+  // 7. Magic Object Eraser (LaMa FFC Neural Inpainting - Sub-second & 0 Cr)
+  eraseObject: async (
+    payload: ObjectEraserPayload
+  ): Promise<BaseToolResponse> => {
+    return handleToolRequest<BaseToolResponse>("/remove-object", {
+      image_url: payload.imageUrl || payload.image_url,
+      mask_base64: payload.maskBase64 || payload.mask_base64,
+      mask_url: payload.maskUrl || payload.mask_url,
+      user_id: payload.userId || payload.user_id,
+    });
+  },
+
+  // 8. Vintage Photo Colorizer (DDColor Neural Restorer - Sub-second & 0 Cr)
+  colorizePhoto: async (
+    payload: ColorizerPayload
+  ): Promise<BaseToolResponse> => {
+    return handleToolRequest<BaseToolResponse>("/colorize", {
+      image_url: payload.imageUrl || payload.image_url,
+      saturation: payload.saturation ?? 1.2,
+      user_id: payload.userId || payload.user_id,
+    });
+  },
+
+  // 9. Multimodal Aesthetic Vision Scanner
+  scanVision: async (imageUrl: string): Promise<VisionScanResponse> => {
+    const headers = await getRequestHeaders();
+    const url = `${API_BASE}/vision-scan`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ image_url: imageUrl }),
+    });
+    if (!res.ok) {
+      throw new Error(`Vision scanner failed: ${res.statusText}`);
+    }
+    return (await res.json()) as VisionScanResponse;
+  },
+
+  // 10. Tool Presets (Relight, Blur, Custom Preset)
+  editPreset: async (params: {
+    imageId?: string;
+    image_id?: string;
+    imageUrl?: string;
+    image_url?: string;
+    action: "relight" | "change_background" | "upscale" | string;
+    targetPreset?: string;
+    target_preset?: string;
+    lockSubject?: boolean;
+    lock_subject?: boolean;
+  }): Promise<BaseToolResponse> => {
+    return handleToolRequest<BaseToolResponse>("/edit-preset", {
+      image_id: params.imageId || params.image_id,
+      image_url: params.imageUrl || params.image_url,
+      action: params.action,
+      target_preset: params.targetPreset || params.target_preset,
+      lock_subject: params.lockSubject ?? params.lock_subject ?? true,
+    });
   },
 
   // Tool History
@@ -313,10 +467,7 @@ export const toolsApi = {
     });
     if (toolType) query.append("tool_type", toolType);
 
-    const base = API_BASE.replace(/\/+$/, "");
-    const url = base.endsWith("/api/v1")
-      ? `${base}/prompt-engineering/tools/history?${query.toString()}`
-      : `${base}/api/v1/prompt-engineering/tools/history?${query.toString()}`;
+    const url = `${API_BASE}/prompt-engineering/tools/history?${query.toString()}`;
 
     try {
       const res = await fetch(url, { headers });

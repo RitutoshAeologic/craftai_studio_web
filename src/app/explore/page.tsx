@@ -4,21 +4,10 @@ import { useState, useMemo, useEffect } from "react";
 import { Search, Heart, ChevronDown, Wand2, X, ShieldCheck, Sparkles, Image as ImageIcon, Camera, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { fetchArtworks, type Artwork } from "@/lib/supabase/db";
+import { theme } from "@/lib/theme/themeGuard";
 
-/* ── Design tokens matching Flutter & Web Spec ──────────────── */
-const S = {
-  bg:          "#0b0b0f",
-  card:        "#121218",
-  cardBorder:  "#1e1e2a",
-  borderLight: "#2e2e3e",
-  cyan:        "#00d4ff",
-  primary:     "#6366f1",
-  primaryDark: "#4f46e5",
-  textPrimary: "#ffffff",
-  textSecondary: "#94a3b8",
-  textMuted:   "#64748b",
-  success:     "#10b981",
-};
+/* ── Design tokens linked directly to Central Theme Guard ────── */
+const S = theme.colors;
 
 /* ── Categories matching specification ──────────────────────── */
 const CATEGORIES = [

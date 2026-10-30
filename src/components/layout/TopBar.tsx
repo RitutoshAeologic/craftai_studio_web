@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, PanelLeftOpen, LogOut } from "lucide-react";
+import { Bell, PanelLeftOpen, LogOut, Palette } from "lucide-react";
 import { useDrawer } from "@/context/DrawerContext";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function TopBar() {
   const pathname = usePathname();
   const { isOpen, toggleDrawer } = useDrawer();
   const { profile, signOut } = useUser();
+  const { colors, preset, setPreset } = useTheme();
 
   const getPageTitle = () => {
     if (pathname === "/") return "AI Chat Workspace";
@@ -23,8 +25,8 @@ export default function TopBar() {
   return (
     <header
       style={{
-        background: "#0a0e18",
-        borderBottom: "1px solid #161d2b",
+        background: colors.background,
+        borderBottom: `1px solid ${colors.borderLight}`,
         position: "sticky",
         top: 0,
         zIndex: 30,
@@ -90,7 +92,32 @@ export default function TopBar() {
         </div>
 
         {/* Right Section — Bell + Avatar */}
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {/* Theme Guard Preset Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Palette size={14} style={{ color: colors.primary }} />
+            <select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value as any)}
+              title="Theme Guard: Change system-wide theme palette"
+              style={{
+                background: colors.surfaceLight,
+                border: `1px solid ${colors.border}`,
+                color: colors.textSecondary,
+                fontSize: "11px",
+                fontWeight: 600,
+                padding: "5px 8px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              <option value="defaultDark">Theme: Indigo (Default)</option>
+              <option value="cyberpunk">Theme: Cyberpunk</option>
+              <option value="obsidian">Theme: Obsidian</option>
+            </select>
+          </div>
+
           <button
             title="Notifications"
             style={{

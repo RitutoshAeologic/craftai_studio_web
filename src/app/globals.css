@@ -6,36 +6,55 @@
    ============================================================ */
 
 :root {
-  /* Canvas & Surfaces */
-  --canvas: #0b0f19;
-  --surface: #151d2f;
-  --surface-hover: #1a2438;
-  --surface-border: #222f4c;
-  --surface-border-subtle: #1e293b;
+  /* Theme Guard Single Source Tokens */
+  --theme-primary: #6366f1;
+  --theme-primary-dark: #4f46e5;
+  --theme-primary-glow: rgba(99, 102, 241, 0.25);
+  --theme-surface: #121218;
+  --theme-surface-light: #1e1e2a;
+  --theme-surface-hover: #1a1a26;
+  --theme-background: #0b0b0f;
+  --theme-border: #2e2e3e;
+  --theme-border-light: #1e1e2a;
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #94a3b8;
+  --theme-text-muted: #64748b;
+  --theme-success: #10b981;
+  --theme-warning: #f59e0b;
+  --theme-error: #ef4444;
+  --theme-copilot: #38bdf8;
+  --theme-purple: #a855f7;
+
+  /* Canvas & Surfaces Aliasing */
+  --canvas: var(--theme-background);
+  --surface: var(--theme-surface);
+  --surface-hover: var(--theme-surface-hover);
+  --surface-border: var(--theme-border);
+  --surface-border-subtle: var(--theme-border-light);
 
   /* Accent Colors */
-  --cyan: #00f2fe;
-  --cyan-glow: rgba(0, 242, 254, 0.2);
-  --cyan-glow-lg: rgba(0, 242, 254, 0.35);
-  --indigo: #6366f1;
-  --indigo-glow: rgba(99, 102, 241, 0.2);
+  --cyan: var(--theme-copilot);
+  --cyan-glow: rgba(56, 189, 248, 0.2);
+  --cyan-glow-lg: rgba(56, 189, 248, 0.35);
+  --indigo: var(--theme-primary);
+  --indigo-glow: var(--theme-primary-glow);
 
   /* Text */
-  --text-primary: #ffffff;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: var(--theme-text-primary);
+  --text-secondary: var(--theme-text-secondary);
+  --text-muted: var(--theme-text-muted);
 
   /* Status */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
+  --success: var(--theme-success);
+  --warning: var(--theme-warning);
+  --error: var(--theme-error);
 
   /* Fonts */
   --font-body: "Inter", system-ui, sans-serif;
   --font-heading: "Outfit", system-ui, sans-serif;
 
   /* Shadows */
-  --shadow-glow-cyan: 0 0 20px rgba(0, 242, 254, 0.25), 0 0 40px rgba(0, 242, 254, 0.1);
+  --shadow-glow-cyan: 0 0 20px rgba(56, 189, 248, 0.25), 0 0 40px rgba(56, 189, 248, 0.1);
   --shadow-glow-indigo: 0 0 20px rgba(99, 102, 241, 0.25), 0 0 40px rgba(99, 102, 241, 0.1);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.5);
 }
@@ -126,20 +145,55 @@ body {
   color: var(--text-muted);
 }
 
-/* ── Buttons ───────────────────────────────────────────────── */
+/* ── Buttons & Theme Guard Controls ───────────────────────── */
+.theme-btn-primary {
+  background: var(--theme-primary);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 16px var(--theme-primary-glow);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-btn-primary:hover {
+  background: var(--theme-primary-dark);
+  transform: translateY(-1px);
+}
+
+.theme-btn-secondary {
+  background: var(--theme-surface-light);
+  color: var(--theme-text-primary);
+  border: 1px solid var(--theme-border);
+  font-weight: 500;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-btn-secondary:hover {
+  background: var(--theme-surface-hover);
+  border-color: var(--theme-primary);
+}
+
 .btn-cyan {
-  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  color: #000;
+  background: linear-gradient(135deg, var(--theme-copilot) 0%, var(--theme-primary) 100%);
+  color: #fff;
   font-weight: 700;
   border-radius: 10px;
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.3), 0 4px 12px rgba(0, 242, 254, 0.15);
+  box-shadow: 0 0 20px var(--cyan-glow), 0 4px 12px rgba(0, 0, 0, 0.3);
   transition: opacity 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
   border: none;
   cursor: pointer;
 }
 .btn-cyan:hover {
-  opacity: 0.92;
-  box-shadow: 0 0 32px rgba(0, 242, 254, 0.5), 0 6px 20px rgba(0, 242, 254, 0.25);
+  opacity: 0.94;
+  box-shadow: 0 0 28px var(--cyan-glow-lg), 0 6px 18px rgba(0, 0, 0, 0.4);
   transform: translateY(-1px);
 }
 .btn-cyan:active {

@@ -16,12 +16,14 @@ import {
   compileChatDelta,
   uploadReferencePhoto,
   cleanupReferencePhoto,
+  scanAestheticVision,
   type StructuredPromptMetadata,
 } from "@/lib/api/backend-client";
 import { PromptInspectorModal } from "@/components/studio/PromptInspectorModal";
 import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
+import { theme } from "@/lib/theme/themeGuard";
 
 /* ── Types & Constants ──────────────────────────────────────── */
 type Model = { id: ImageModel; label: string; version: string };
@@ -77,24 +79,8 @@ const ANCHOR_TAGS = [
   "Facial Likeness",
 ];
 
-/* ── Shared style tokens matching Mobile & Web Spec ─────────── */
-const S = {
-  bg:          "#0b0b0f",
-  panel:       "#121218",
-  panelBorder: "#1e1e2a",
-  card:        "#161d2b",
-  cardBorder:  "#2e2e3e",
-  cyan:        "#00d4ff",
-  cyanDark:    "#00b8db",
-  primary:     "#6366f1",
-  primaryDark: "#4f46e5",
-  textPrimary: "#ffffff",
-  textSecondary: "#94a3b8",
-  textMuted:   "#64748b",
-  success:     "#10b981",
-  warning:     "#f59e0b",
-  error:       "#ef4444",
-};
+/* ── Shared style tokens matching Mobile & Web Spec (Linked to Theme Guard) ── */
+const S = theme.colors;
 
 interface ChatDeltaDiff {
   added: string[];
@@ -507,6 +493,34 @@ function StudioContent() {
     }
   };
 
+  const [isScanningVision, setIsScanningVision] = useState(false);
+
+  const handleScanAesthetic = async () => {
+    if (!refImage) return;
+    setIsScanningVision(true);
+    try {
+      const scan = await scanAestheticVision(refImage);
+      if (scan?.extracted_prompt) {
+        setPromptRecipe(scan.extracted_prompt);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `scan-${Date.now()}`,
+            role: "assistant",
+            content: `Aesthetic Vision Scanned! Extracted Style: "${scan.detected_style || "Natural"}", Lighting: "${scan.lighting_optics || "Cinematic"}"`,
+            timestamp: "Just now",
+            status: "completed",
+            suggestedChips: [scan.detected_style, scan.lighting_optics, "Make it cinematic"].filter(Boolean),
+          },
+        ]);
+      }
+    } catch (err) {
+      console.warn("Vision scan failed:", err);
+    } finally {
+      setIsScanningVision(false);
+    }
+  };
+
   /* ── 4. Style Booster Tag Toggling ───────────────────────── */
   const toggleBooster = (tag: string) => {
     const isApplied = promptRecipe.toLowerCase().includes(tag.toLowerCase());
@@ -583,35 +597,42 @@ function StudioContent() {
       const taskId = dispatchRes.task_id;
       let finalUrl = dispatchRes.direct_image_url;
 
-      // Step B: Connect to WebSocket progress stream (with HTTP polling fallback)
-      await new Promise<void>((resolve) => {
-        const unsubscribe = subscribeGenerationProgress(
-          taskId,
-          (event) => {
-            setProgressPercent(event.progress);
-            setProgressMessage(event.message || "Diffusing image latents...");
-            if (event.output_url) finalUrl = event.output_url;
-          },
-          (outputUrl) => {
-            if (outputUrl) finalUrl = outputUrl;
-            setProgressPercent(100);
-            setProgressMessage("✨ Masterpiece ready! Rendering pixels...");
-            unsubscribe();
-            setTimeout(resolve, 400);
-          },
-          (errMsg) => {
-            console.warn("WebSocket stream error, fallback:", errMsg);
+      // Step B: Connect to WebSocket progress stream ONLY if task is queued/processing
+      if (dispatchRes.status === "ready" && finalUrl) {
+        setProgressPercent(60);
+        setProgressMessage("Rendering pixels...");
+        await new Promise((r) => setTimeout(r, 400));
+        setProgressPercent(100);
+      } else {
+        await new Promise<void>((resolve) => {
+          const unsubscribe = subscribeGenerationProgress(
+            taskId,
+            (event) => {
+              setProgressPercent(event.progress);
+              setProgressMessage(event.message || "Diffusing image latents...");
+              if (event.output_url) finalUrl = event.output_url;
+            },
+            (outputUrl) => {
+              if (outputUrl) finalUrl = outputUrl;
+              setProgressPercent(100);
+              setProgressMessage("✨ Masterpiece ready! Rendering pixels...");
+              unsubscribe();
+              setTimeout(resolve, 400);
+            },
+            (errMsg) => {
+              console.warn("WebSocket stream error, fallback:", errMsg);
+              unsubscribe();
+              resolve();
+            }
+          );
+
+          // 35-second hard safety timeout
+          setTimeout(() => {
             unsubscribe();
             resolve();
-          }
-        );
-
-        // 35-second hard safety timeout
-        setTimeout(() => {
-          unsubscribe();
-          resolve();
-        }, 35000);
-      });
+          }, 35000);
+        });
+      }
 
       // Step C: Fallback to client generation if backend didn't provide direct URL
       if (!finalUrl) {
@@ -907,14 +928,103 @@ function StudioContent() {
                   border: ratio.id === r.id ? `1px solid ${S.primary}` : `1px solid ${S.cardBorder}`,
                   background: ratio.id === r.id ? S.primary : "transparent",
                   color: ratio.id === r.id ? "#ffffff" : S.textSecondary,
-                  fontSize: "11px",
-                  fontWeight: ratio.id === r.id ? 700 : 500,
                   cursor: "pointer",
                 }}
               >
                 {r.label}
               </button>
             ))}
+
+            <div style={{ width: "1px", height: "18px", background: S.panelBorder }} />
+
+            {/* Reference Image & Vision Scanner Bar */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file);
+              }}
+            />
+
+            {!refImage ? (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "5px 12px",
+                  borderRadius: "8px",
+                  border: `1px dashed ${S.cardBorder}`,
+                  background: "transparent",
+                  color: S.textSecondary,
+                  fontSize: "11px",
+                  cursor: isBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                <Camera size={13} />
+                <span>+ Ref / Face</span>
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "3px 8px",
+                    borderRadius: "8px",
+                    background: "rgba(99, 102, 241, 0.15)",
+                    border: `1px solid ${S.primary}`,
+                    color: S.textPrimary,
+                    fontSize: "11px",
+                  }}
+                >
+                  <img
+                    src={refImage}
+                    alt="Ref"
+                    style={{ width: "16px", height: "16px", borderRadius: "50%", objectFit: "cover" }}
+                  />
+                  <span>Ref Active</span>
+                  <button
+                    onClick={() => {
+                      setRefImage(null);
+                      setIsFaceLockActive(false);
+                    }}
+                    style={{ background: "transparent", border: "none", color: S.textMuted, cursor: "pointer", fontSize: "11px" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 1-Tap Aesthetic Vision Scanner */}
+                <button
+                  onClick={handleScanAesthetic}
+                  disabled={isScanningVision || isBusy}
+                  title="Reverse-engineer aesthetic concepts & camera optics via Gemini Vision"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 10px",
+                    borderRadius: "8px",
+                    background: isScanningVision ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                    border: `1px solid ${S.cyan}`,
+                    color: S.cyan,
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    cursor: isScanningVision ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <Sparkles size={12} />
+                  <span>{isScanningVision ? "Scanning..." : "Scan Aesthetic"}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Canvas with Live Progress Card & Image Display */}

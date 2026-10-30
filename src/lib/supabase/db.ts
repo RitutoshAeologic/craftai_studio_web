@@ -667,6 +667,7 @@ export async function savePrivateArtwork(params: {
   image_url: string;
   model?: string;
   aspect_ratio?: string;
+  user_id?: string;
 }): Promise<Generation> {
   const cleanPrompt = (params.prompt || "").trim();
   const savedItem: Generation = {
@@ -676,6 +677,7 @@ export async function savePrivateArtwork(params: {
     model: params.model || "Flux Schnell",
     aspect_ratio: params.aspect_ratio || "1:1",
     created_at: new Date().toISOString(),
+    user_id: params.user_id,
   };
 
   if (typeof window !== "undefined") {
@@ -689,11 +691,50 @@ export async function savePrivateArtwork(params: {
     }
   }
 
+  // Cross-device sync to Supabase collection_items
+  const supabase = createClient();
+  if (supabase && params.user_id && !params.user_id.includes("default") && !params.user_id.includes("@")) {
+    try {
+      await supabase.from("collection_items").insert({
+        user_id: params.user_id,
+        image_url: params.image_url,
+      });
+    } catch {}
+  }
+
   return savedItem;
 }
 
-/* ── Fetch Saved Bookmarks ───────────────────────────────────── */
-export async function fetchBookmarks(): Promise<Generation[]> {
+/* ── Fetch Saved Bookmarks (Synced to Supabase collection_items with local cache) ── */
+export async function fetchBookmarks(userIdentifier?: string): Promise<Generation[]> {
+  // Check Supabase collection_items for cross-device parity
+  const supabase = createClient();
+  if (supabase && userIdentifier && !userIdentifier.includes("default") && !userIdentifier.includes("@")) {
+    try {
+      const { data } = await supabase
+        .from("collection_items")
+        .select("*")
+        .eq("user_id", userIdentifier)
+        .order("created_at", { ascending: false });
+
+      if (data && data.length > 0) {
+        const mapped: Generation[] = data.map((item: any) => ({
+          id: item.job_id || item.explore_prompt_id || item.id,
+          prompt: "Saved Collection Item",
+          image_url: item.image_url,
+          model: "Collection Bookmark",
+          aspect_ratio: "1:1",
+          created_at: item.created_at,
+          user_id: item.user_id,
+        }));
+        if (typeof window !== "undefined") {
+          localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(mapped));
+        }
+        return mapped;
+      }
+    } catch {}
+  }
+
   if (typeof window !== "undefined") {
     try {
       const existing = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]");
@@ -877,6 +918,14 @@ export async function unlockGenerationDownload(
   const supabase = createClient();
   if (supabase) {
     try {
+      if (userIdentifier && !userIdentifier.includes("default") && !userIdentifier.includes("@")) {
+        await supabase.rpc("deduct_user_credits", {
+          p_user_id: userIdentifier,
+          p_amount: 2.0,
+          p_task_id: id,
+          p_reason: "download_4k_master",
+        });
+      }
       await supabase
         .from("jobs")
         .update({ is_download_unlocked: true })

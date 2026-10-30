@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { DrawerProvider } from "@/context/DrawerContext";
 import { UserProvider } from "@/context/UserContext";
 import { LLMConfigProvider } from "@/context/LLMConfigContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import AppDrawer from "./AppDrawer";
 import TopBar from "./TopBar";
 
@@ -12,18 +13,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname.startsWith("/auth");
 
   if (isAuthPage) {
-    return <>{children}</>;
+    return <ThemeProvider>{children}</ThemeProvider>;
   }
 
   return (
-    <UserProvider>
-      {/* LLMConfigProvider fetches GET /api/v1/prompt-engineering/config on mount
-          and polls every 60s so the UI always reflects Supabase app_settings changes
-          without requiring a redeploy. Must be inside UserProvider so it can inject
-          the bearer JWT when calling the config endpoint. */}
-      <LLMConfigProvider>
-        <DrawerProvider>
-          <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", background: "#0a0e18" }}>
+    <ThemeProvider>
+      <UserProvider>
+        {/* LLMConfigProvider fetches GET /api/v1/prompt-engineering/config on mount
+            and polls every 60s so the UI always reflects Supabase app_settings changes
+            without requiring a redeploy. Must be inside UserProvider so it can inject
+            the bearer JWT when calling the config endpoint. */}
+        <LLMConfigProvider>
+          <DrawerProvider>
+            <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", background: "var(--theme-background, #0b0b0f)" }}>
             {/* Leftmost Collapsible Sidebar Drawer */}
             <AppDrawer />
 
@@ -38,5 +40,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </DrawerProvider>
       </LLMConfigProvider>
     </UserProvider>
-  );
+  </ThemeProvider>
+);
 }

@@ -21,10 +21,12 @@ import {
   Sliders,
 } from "lucide-react";
 import { fetchGenerations, deleteGeneration, fetchWallet, isCreativeToolGeneration, type Generation } from "@/lib/supabase/db";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function AppDrawer() {
   const { isOpen, toggleDrawer, setIsOpen } = useDrawer();
   const { profile, user, signOut } = useUser();
+  const { colors } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -110,8 +112,8 @@ export default function AppDrawer() {
           width: isMobile ? "min(300px, 85vw)" : (isOpen ? "260px" : "68px"),
           minWidth: isMobile ? "auto" : (isOpen ? "260px" : "68px"),
           height: "100vh",
-          background: "#0a0e18",
-          borderRight: "1px solid #1e2533",
+          background: colors.background,
+          borderRight: `1px solid ${colors.borderLight}`,
           display: "flex",
           flexDirection: "column",
           transition: isMobile ? "none" : "width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
