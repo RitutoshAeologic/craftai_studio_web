@@ -63,6 +63,7 @@ export interface DispatchGenerationParams {
   seed?: number;
   model?: "flux" | "gemini" | "chatgpt" | string;
   remixed_from_prompt_id?: string | null;
+  edit_instruction?: string | null;
 }
 
 export interface DispatchGenerationResponse {
@@ -97,6 +98,7 @@ export async function dispatchGeneration(
           seed: params.seed ?? Math.floor(Math.random() * 1_000_000),
           model: params.model ?? "flux",
           remixed_from_prompt_id: params.remixed_from_prompt_id ?? null,
+          edit_instruction: params.edit_instruction ?? null,
         }),
       }
     );
@@ -457,8 +459,9 @@ export async function removeBackground(
 }
 
 export async function editPresetTool(params: {
-  image_id: string;
-  action: "relight" | "change_background" | "upscale";
+  image_id?: string;
+  image_url?: string;
+  action: "relight" | "change_background" | "bokeh" | "upscale" | string;
   target_preset?: string;
   target_background?: string;
   lock_subject?: boolean;

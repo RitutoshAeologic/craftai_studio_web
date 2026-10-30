@@ -289,7 +289,7 @@ export async function fetchArtworks(): Promise<Artwork[]> {
     }
   }
 
-  // 2. Try fetching from Supabase DB
+  // 2. Try fetching from Supabase DB (silently fallback if table not yet migrated)
   const supabase = createClient();
   if (supabase) {
     try {
@@ -304,8 +304,8 @@ export async function fetchArtworks(): Promise<Artwork[]> {
         }
         return data as Artwork[];
       }
-    } catch (e) {
-      console.warn("Supabase artworks fetch fallback to seeded data", e);
+    } catch {
+      // Table unmigrated or network fallback - seamlessly use cache/seed
     }
   }
 
@@ -320,8 +320,8 @@ async function syncArtworksFromSupabase() {
   const supabase = createClient();
   if (!supabase) return;
   try {
-    const { data } = await supabase.from("artworks").select("*").order("created_at", { ascending: false });
-    if (data && data.length > 0 && typeof window !== "undefined") {
+    const { data, error } = await supabase.from("artworks").select("*").order("created_at", { ascending: false });
+    if (!error && data && data.length > 0 && typeof window !== "undefined") {
       localStorage.setItem(ARTWORKS_KEY, JSON.stringify(data));
     }
   } catch {
@@ -648,13 +648,16 @@ export async function publishArtwork(params: {
     }
   }
 
-  // 2. Persist to Supabase DB
+  // 2. Persist to Supabase DB (safely attempt without breaking UI or throwing errors)
   const supabase = createClient();
   if (supabase) {
     try {
-      await supabase.from("artworks").insert([newArt]);
-    } catch (e) {
-      console.warn("Supabase publish artwork background notice", e);
+      const { error } = await supabase.from("artworks").insert([newArt]);
+      if (error && error.code !== "PGRST205") {
+        console.debug("[Supabase] Publish sync notice:", error.message);
+      }
+    } catch {
+      // Offline / unmigrated fallback handled cleanly in local storage
     }
   }
 

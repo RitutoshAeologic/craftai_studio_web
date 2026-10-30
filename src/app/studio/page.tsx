@@ -16,6 +16,7 @@ import {
   compileChatDelta,
   uploadReferencePhoto,
   cleanupReferencePhoto,
+  editPresetTool,
   type StructuredPromptMetadata,
 } from "@/lib/api/backend-client";
 import { PromptInspectorModal } from "@/components/studio/PromptInspectorModal";
@@ -41,11 +42,11 @@ const RATIOS: Ratio[] = [
   { id: "4:5",  label: "4:5 Portrait" },
 ];
 
-const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
-  "1:1": { width: 1024, height: 1024 },
-  "16:9": { width: 1344, height: 768 },
-  "9:16": { width: 768, height: 1344 },
-  "4:5": { width: 896, height: 1120 },
+const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number; cssRatio: string }> = {
+  "1:1":  { width: 1024, height: 1024, cssRatio: "1 / 1" },
+  "16:9": { width: 1344, height: 768,  cssRatio: "16 / 9" },
+  "9:16": { width: 768,  height: 1344, cssRatio: "9 / 16" },
+  "4:5":  { width: 896,  height: 1120, cssRatio: "4 / 5" },
 };
 
 // LLM_ENGINES is now derived dynamically from the backend config (see StudioContent).
@@ -141,6 +142,8 @@ function StudioContent() {
   );
   // Tracks how many delta turns have occurred in this session (max 5 per backend rule)
   const copilotTurnCount = useRef<number>(0);
+  // Active RNG seed for image continuity across Chat Copilot iterations
+  const activeSeedRef = useRef<number>(Math.floor(Math.random() * 900_000) + 100_000);
 
   useEffect(() => {
     if (querySessionId) activeSessionId.current = querySessionId;
@@ -264,7 +267,7 @@ function StudioContent() {
   const studioPollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
   const [currentImage, setCurrentImage] = useState(
     queryImage || (
-      queryPrompt
+      queryPrompt && queryPrompt.length < 300
         ? `https://gen.pollinations.ai/image/${encodeURIComponent(queryPrompt)}?model=flux&width=1024&height=1024&seed=7777&nologo=true&key=${studioPollinationsKey}`
         : fallbackMain
     )
@@ -399,7 +402,7 @@ function StudioContent() {
     }
   }
 
-  /* ── 2. Prompt Chat Copilot (Delta Instruction Compiler) ─── */
+  /* ── 2. Prompt Chat Copilot (Delta Instruction Compiler & Subject-Locked Modifiers) ─── */
   async function handleChatDeltaSubmit(instruction: string) {
     const cleanInstruction = instruction.trim();
     if (!cleanInstruction || isBusy) return;
@@ -419,12 +422,111 @@ function StudioContent() {
       {
         id: aiMsgId,
         role: "assistant",
-        content: "Compiling prompt adjustments...",
+        content: "Analyzing modification request...",
         timestamp: "Just now",
         status: "synthesizing",
       },
     ]);
 
+    const lower = cleanInstruction.toLowerCase();
+    const isBokeh = lower.includes("bokeh") || lower.includes("depth of field");
+    const isGoldenHour = lower.includes("golden hour") || lower.includes("sunset warmth");
+    const isNeon = lower.includes("neon") || lower.includes("cyberpunk");
+    const isRimOrCinematic = lower.includes("cinematic") || lower.includes("lighting") || lower.includes("rim");
+    const isUpscale = lower.includes("8k") || lower.includes("upscale") || lower.includes("photorealistic");
+
+    const hasActiveImage = currentImage && currentImage.startsWith("http") && !currentImage.includes("unsplash.com");
+
+    // Route 1: Instant Zero-Token Subject-Locked Filter/Optics/Lighting Transform on the EXACT current image
+    if (hasActiveImage && (isBokeh || isGoldenHour || isNeon || isRimOrCinematic || isUpscale)) {
+      let action: "relight" | "bokeh" | "upscale" = "relight";
+      let preset = "golden_hour";
+      let label = "Golden Hour Warmth";
+
+      if (isBokeh) {
+        action = "bokeh";
+        preset = "soft_bokeh";
+        label = "Depth of Field Bokeh";
+      } else if (isGoldenHour) {
+        action = "relight";
+        preset = "golden_hour";
+        label = "Golden Hour Warmth";
+      } else if (isNeon) {
+        action = "relight";
+        preset = "studio_neon";
+        label = "Cyberpunk Studio Neon";
+      } else if (isRimOrCinematic) {
+        action = "relight";
+        preset = "rim_light";
+        label = "Cinematic Rim Lighting";
+      } else if (isUpscale) {
+        action = "upscale";
+        preset = "ultra_hd";
+        label = "2X HD Detail Upscale";
+      }
+
+      setGenerating(true);
+      setImageLoading(true);
+      setProgressPercent(45);
+      setProgressMessage(`Modifying artwork with ${label}...`);
+
+      try {
+        const toolRes = await editPresetTool({
+          image_url: currentImage,
+          action,
+          target_preset: preset,
+          lock_subject: true,
+        });
+
+        if (toolRes.output_url) {
+          setCurrentImage(toolRes.output_url);
+          setProgressPercent(100);
+          setProgressMessage("✨ Modification applied!");
+
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMsgId
+                ? {
+                    ...msg,
+                    content: `✨ Applied ${label} to your artwork with 100% subject and scene preservation!`,
+                    status: "completed",
+                    suggestedChips: [
+                      "Make him wear glasses",
+                      "Add warm studio lighting",
+                      "Add depth of field bokeh",
+                      "Change shirt to navy blue",
+                    ],
+                  }
+                : msg
+            )
+          );
+
+          // Save modified artwork to history
+          await saveGeneration(
+            {
+              prompt: `${lastGeneratedPrompt || promptRecipe} (${label} Mod)`,
+              image_url: toolRes.output_url,
+              model: `${model.label} + ${label}`,
+              aspect_ratio: ratio.id,
+              user_id: user?.id,
+              user_email: profile.email,
+            },
+            userKey,
+            activeSessionId.current
+          );
+
+          setGenerating(false);
+          setImageLoading(false);
+          setProgressPercent(0);
+          setProgressMessage("");
+          return;
+        }
+      } catch (toolErr) {
+        console.warn("Preset tool transform failed, falling back to prompt delta:", toolErr);
+      }
+    }
+
+    // Route 2: Semantic / Structural Prompt Modification with Seed & Subject Continuity
     try {
       const baseToUse = lastGeneratedPrompt || promptRecipe;
       // Increment turn counter (backend enforces max 5 turns per session)
@@ -433,11 +535,8 @@ function StudioContent() {
       const res = await compileChatDelta({
         base_prompt: baseToUse,
         user_instruction: cleanInstruction,
-        // Pass stable session UUID — fixes 422 Unprocessable Entity from backend
-        // (PromptDeltaRequest.session_id is a required Field on the backend schema)
         session_id: copilotSessionId.current,
         turn_count: copilotTurnCount.current,
-        // Use active backend provider for delta compilation (respects Supabase config)
         ai_model: selectedEngine || llmConfig.active_provider || "groq",
       });
 
@@ -451,10 +550,10 @@ function StudioContent() {
             msg.id === aiMsgId
               ? {
                   ...msg,
-                  content: res.delta_summary || `Applied adjustments: "${cleanInstruction}"`,
+                  content: res.delta_summary || `Applied adjustments: "${cleanInstruction}". Refining artwork with preserved subject likeness...`,
                   status: "completed",
                   diff: res.diff,
-                  suggestedChips: res.suggested_chips || ["Add Neon Reflections", "35mm Portrait Bokeh"],
+                  suggestedChips: res.suggested_chips || ["Add depth of field bokeh", "Add cinematic lighting", "Make him wear glasses"],
                   deltaSummary: res.delta_summary,
                   structuredMetadata: res.structured_metadata,
                 }
@@ -462,8 +561,8 @@ function StudioContent() {
           )
         );
 
-        // Auto trigger generation with refined prompt
-        executeGenerate(res.compiled_prompt);
+        // Auto trigger generation with refined prompt, retaining seed and anchoring existing image
+        executeGenerate(res.compiled_prompt, { isModification: true, seed: activeSeedRef.current, instruction: cleanInstruction });
       }
     } catch {
       setChatMessages((prev) =>
@@ -471,13 +570,13 @@ function StudioContent() {
           msg.id === aiMsgId
             ? {
                 ...msg,
-                content: `Could not compile prompt delta. Generating directly with: "${cleanInstruction}"`,
+                content: `Could not compile prompt delta. Refining directly with: "${cleanInstruction}"`,
                 status: "completed",
               }
             : msg
         )
       );
-      executeGenerate(`${promptRecipe}, ${cleanInstruction}`);
+      executeGenerate(`${promptRecipe}, ${cleanInstruction}`, { isModification: true, seed: activeSeedRef.current });
     }
   }
 
@@ -509,30 +608,41 @@ function StudioContent() {
 
   /* ── 4. Style Booster Tag Toggling ───────────────────────── */
   const toggleBooster = (tag: string) => {
-    const isApplied = promptRecipe.toLowerCase().includes(tag.toLowerCase());
-    if (isApplied) {
-      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      let updated = promptRecipe.replace(new RegExp(`\\s*,\\s*${escaped}`, "gi"), "");
-      updated = updated.replace(new RegExp(`${escaped}\\s*,?\\s*`, "gi"), "");
-      updated = updated.replace(/\s*,\s*$/, "").replace(/^\s*,\s*/, "").trim();
-      setPromptRecipe(updated);
+    const hasActiveImage = currentImage && currentImage.startsWith("http") && !currentImage.includes("unsplash.com");
+    if (hasActiveImage) {
+      // Send directly to Chat Copilot to modify the active artwork with subject preservation
+      handleChatDeltaSubmit(tag);
     } else {
-      const clean = promptRecipe.trim();
-      const separator = clean.length > 0 && !clean.endsWith(",") ? ", " : " ";
-      setPromptRecipe(clean ? `${clean}${separator}${tag}` : tag);
+      // Append / toggle in promptRecipe for upcoming initial generation
+      const isApplied = promptRecipe.toLowerCase().includes(tag.toLowerCase());
+      if (isApplied) {
+        const escaped = tag.replace(/[-/\^+?.()|[\]{}]/g, "\$&");
+        let updated = promptRecipe.replace(new RegExp(`\s*,\s*${escaped}`, "gi"), "");
+        updated = updated.replace(new RegExp(`${escaped}\s*,?\s*`, "gi"), "");
+        updated = updated.replace(/\s*,\s*$/, "").replace(/^\s*,\s*/, "").trim();
+        setPromptRecipe(updated);
+      } else {
+        const clean = promptRecipe.trim();
+        const separator = clean.length > 0 && !clean.endsWith(",") ? ", " : " ";
+        setPromptRecipe(clean ? `${clean}${separator}${tag}` : tag);
+      }
     }
   };
 
-  /* ── 5. Main Generation Execution (FastAPI + WebSocket Stream) ── */
-  async function executeGenerate(recipe: string) {
+  /* ── 5. Main Generation Execution (FastAPI + WebSocket Stream with Seed Continuity) ── */
+  async function executeGenerate(recipe: string, options?: { isModification?: boolean; seed?: number; instruction?: string; targetRatio?: Ratio }) {
     const clean = recipe.trim();
     if (!clean || clean.length < 3 || isBusy) return;
+
+    const activeRatio = options?.targetRatio ?? ratio;
+    const currentSeed = options?.seed ?? activeSeedRef.current;
+    activeSeedRef.current = currentSeed;
 
     setGenerating(true);
     setImageLoading(true);
     setGenerationError(null);
     setProgressPercent(5);
-    setProgressMessage("Preparing creative canvas...");
+    setProgressMessage(options?.isModification ? `Reframing into ${activeRatio.label} with subject preservation...` : "Preparing creative canvas...");
 
     const aiMsgId = `ai-${Date.now()}`;
 
@@ -541,20 +651,31 @@ function StudioContent() {
       {
         id: aiMsgId,
         role: "assistant",
-        content: `Synthesizing latents with ${model.label} (${ratio.label})...`,
+        content: options?.isModification
+          ? `Refining artwork with ${model.label} (${activeRatio.label}, Subject & Scene Locked)...`
+          : `Synthesizing latents with ${model.label} (${activeRatio.label})...`,
         timestamp: "Just now",
         status: "synthesizing",
       },
     ]);
 
     // Prepare dispatch payload
-    const { width, height } = ASPECT_DIMENSIONS[ratio.id];
+    const { width, height } = ASPECT_DIMENSIONS[activeRatio.id];
     const faceUrls = Object.values(faceAngleSlots).filter(Boolean) as string[];
     if (refImage && !faceUrls.includes(refImage)) {
       faceUrls.push(refImage);
     }
+    // Detect if instruction is explicitly transforming subject identity or gender
+    const isIdentityOrGenderChange = /\b(female|woman|girl|lady|male|man|boy|guy|different person|new person|change person)\b/i.test(options?.instruction || clean);
 
-    // Determine prompt to send (Secret Formula DRM: dispatch master recipe if armed)
+    // If modifying an active image, only anchor existing photo if we are NOT replacing the person/gender
+    if (options?.isModification && currentImage && currentImage.startsWith("http") && !currentImage.includes("unsplash.com") && !faceUrls.includes(currentImage)) {
+      if (!isIdentityOrGenderChange) {
+        faceUrls.push(currentImage);
+      }
+    }
+
+    // Determine prompt to send
     let promptToSend = armedMasterFormula || clean;
     if (refImage && !armedMasterFormula) {
       const subject = anchorSubject.trim() || refName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || "character likeness";
@@ -565,10 +686,16 @@ function StudioContent() {
       } else {
         promptToSend = `Atmosphere inspired by reference: (${subject}), scene: ${clean}`;
       }
+    } else if (options?.isModification && !armedMasterFormula) {
+      if (isIdentityOrGenderChange) {
+        promptToSend = `Seamless modification into: ${clean}, natural anatomically correct posture, delicate female wrists, single wristwatch on left wrist only, photorealistic 8k`;
+      } else if (faceUrls.length > 0) {
+        promptToSend = `Featuring exact same character and scene composition: seamless modification into: ${clean}, maintaining subject likeness, photorealistic 8k`;
+      }
     }
 
     try {
-      // Step A: Dispatch task to FastAPI backend
+      // Step A: Dispatch task to FastAPI backend with locked seed
       const dispatchRes = await dispatchGeneration({
         prompt: promptToSend,
         negative_prompt: negativePrompt,
@@ -576,15 +703,22 @@ function StudioContent() {
         face_reference_urls: faceUrls.length > 0 ? faceUrls : null,
         width,
         height,
+        seed: currentSeed,
         model: model.id,
         remixed_from_prompt_id: remixedFromPromptId.current,
+        edit_instruction: options?.instruction ?? null,
       });
 
       const taskId = dispatchRes.task_id;
       let finalUrl = dispatchRes.direct_image_url;
 
-      // Step B: Connect to WebSocket progress stream (with HTTP polling fallback)
-      await new Promise<void>((resolve) => {
+      // If backend already delivered the direct image (e.g. Cloudflare Workers AI / Supabase CDN)
+      if (dispatchRes.status === "ready" && finalUrl) {
+        setProgressPercent(100);
+        setProgressMessage("✨ Masterpiece ready! Rendering pixels...");
+      } else {
+        // Step B: Connect to WebSocket progress stream (with HTTP polling fallback)
+        await new Promise<void>((resolve) => {
         const unsubscribe = subscribeGenerationProgress(
           taskId,
           (event) => {
@@ -612,19 +746,24 @@ function StudioContent() {
           resolve();
         }, 35000);
       });
+      }
 
       // Step C: Fallback to client generation if backend didn't provide direct URL
       if (!finalUrl) {
         finalUrl = await generateFreeImage({
           prompt: promptToSend,
           model: model.id,
-          aspectRatio: ratio.id,
-          referenceImage: refImage && refImage.startsWith("http") ? refImage : undefined,
+          aspectRatio: activeRatio.id,
+          seed: currentSeed,
+          referenceImage: faceUrls[0] || (refImage && refImage.startsWith("http") ? refImage : undefined),
         });
       }
 
-      // Step D: Strip watermark
-      const cleanUrl = await stripWatermark(finalUrl);
+      // Step D: Strip watermark only for pollinations URLs
+      let cleanUrl = finalUrl;
+      if (finalUrl && finalUrl.includes("pollinations.ai")) {
+        cleanUrl = await stripWatermark(finalUrl);
+      }
       setCurrentImage(cleanUrl);
       setLastGeneratedPrompt(clean);
       setArmedMasterFormula(null); // Reset armed formula on success
@@ -635,7 +774,7 @@ function StudioContent() {
           prompt: clean,
           image_url: cleanUrl,
           model: model.label,
-          aspect_ratio: ratio.id,
+          aspect_ratio: activeRatio.id,
           user_id: user?.id,
           user_email: profile.email,
         },
@@ -651,7 +790,9 @@ function StudioContent() {
           msg.id === aiMsgId
             ? {
                 ...msg,
-                content: `Artwork generated with ${model.label}! Ready to refine or download in 4K.`,
+                content: options?.isModification
+                  ? `Artwork modified with ${model.label}! Subject likeness and scene preserved.`
+                  : `Artwork generated with ${model.label}! Ready to refine or download in 4K.`,
                 status: "completed",
                 suggestedChips: ["Add cinematic lighting", "Make photorealistic 8K", "Add depth of field bokeh"],
               }
@@ -664,14 +805,14 @@ function StudioContent() {
         cleanupReferencePhoto(refImage);
       }
     } catch (err: any) {
-      console.error("Generation error:", err);
-      setGenerationError(err?.message || "Synthesis encountered a problem. Click retry to run again.");
+      console.error("Studio Generation Error:", err);
+      setGenerationError(err?.message || "Generation pipeline timed out. Please try again.");
       setChatMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
             ? {
                 ...msg,
-                content: "Generation failed or timed out. Please try adjusting your prompt or click retry.",
+                content: `Generation encountered an issue: ${err?.message || "Network timeout"}. Please retry.`,
                 status: "completed",
               }
             : msg
@@ -679,6 +820,7 @@ function StudioContent() {
       );
     } finally {
       setGenerating(false);
+      setImageLoading(false);
       setProgressPercent(0);
       setProgressMessage("");
     }
@@ -689,7 +831,9 @@ function StudioContent() {
     const textToRun = promptRecipe.trim();
     if (!textToRun) return;
     if (isMobileOrTablet) setActiveMobileTab("canvas");
-    executeGenerate(textToRun);
+    // Fresh concept generation creates a new random seed
+    activeSeedRef.current = Math.floor(Math.random() * 900_000) + 100_000;
+    executeGenerate(textToRun, { isModification: false, seed: activeSeedRef.current });
   }
 
   /* ── Save & Publish Handlers ──────────────────────────────── */
@@ -910,6 +1054,7 @@ function StudioContent() {
                   fontSize: "11px",
                   fontWeight: ratio.id === r.id ? 700 : 500,
                   cursor: "pointer",
+                  transition: "all 0.2s ease",
                 }}
               >
                 {r.label}
@@ -1019,16 +1164,24 @@ function StudioContent() {
             )}
 
             {/* Rendered Artwork Image */}
-            <div style={{
-              position: "relative",
-              maxWidth: "100%",
-              maxHeight: "calc(100vh - 160px)",
-              display: generating ? "none" : "block",
-              borderRadius: "14px",
-              overflow: "hidden",
-              boxShadow: "0 20px 48px rgba(0,0,0,0.8)",
-              border: `1px solid ${S.cardBorder}`,
-            }}>
+            <div
+              style={{
+                position: "relative",
+                aspectRatio: ASPECT_DIMENSIONS[ratio.id].cssRatio,
+                maxWidth: "100%",
+                maxHeight: "calc(100vh - 180px)",
+                width: ratio.id === "16:9" ? "min(960px, 100%)" : ratio.id === "9:16" ? "min(500px, 100%)" : ratio.id === "4:5" ? "min(580px, 100%)" : "min(700px, 100%)",
+                display: generating ? "none" : "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "16px",
+                overflow: "hidden",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.85)",
+                border: `1px solid ${S.cardBorder}`,
+                transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                background: "#080c14",
+              }}
+            >
               <img
                 src={currentImage}
                 alt="Generated artwork"
@@ -1038,14 +1191,39 @@ function StudioContent() {
                   setImageLoading(false);
                 }}
                 style={{
-                  maxWidth: "100%",
-                  maxHeight: "calc(100vh - 160px)",
-                  objectFit: "contain",
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
                   display: "block",
-                  clipPath: "inset(0 0 40px 0)",
-                  marginBottom: "-40px",
+                  transition: "opacity 0.2s ease",
                 }}
               />
+
+              {/* Active Aspect Ratio & Resolution Badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "12px",
+                  right: "12px",
+                  padding: "4px 10px",
+                  borderRadius: "8px",
+                  background: "rgba(11, 11, 15, 0.75)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  color: S.textSecondary,
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.5px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  pointerEvents: "none",
+                }}
+              >
+                <span style={{ color: S.cyan }}>{ratio.label}</span>
+                <span style={{ color: S.textMuted }}>•</span>
+                <span>{ASPECT_DIMENSIONS[ratio.id].width}×{ASPECT_DIMENSIONS[ratio.id].height}</span>
+              </div>
             </div>
           </div>
 
@@ -1438,8 +1616,16 @@ function StudioContent() {
                 value={promptRecipe}
                 disabled={isBusy}
                 onChange={(e) => setPromptRecipe(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (promptRecipe.trim() && !isBusy) {
+                      handleChatDeltaSubmit(promptRecipe);
+                    }
+                  }
+                }}
                 rows={3}
-                placeholder={isBusy ? "Synthesis in progress..." : "Describe your concept or enter conversational instructions..."}
+                placeholder={isBusy ? "Synthesis in progress..." : "Type instructions or concept (press Enter to send to Copilot)..."}
                 style={{
                   width: "100%",
                   background: isBusy ? "#0a0e18" : S.card,
@@ -1655,22 +1841,24 @@ function StudioContent() {
 
                 <button
                   id="btn-copilot-tweak"
-                  disabled={isBusy}
+                  disabled={isBusy || !promptRecipe.trim()}
                   onClick={() => handleChatDeltaSubmit(promptRecipe)}
+                  title="Send instruction to Chat Copilot to modify artwork"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "5px",
-                    padding: "6px 10px",
+                    padding: "6px 12px",
                     borderRadius: "8px",
-                    background: "transparent",
-                    border: `1px solid ${S.cardBorder}`,
-                    color: S.textSecondary,
+                    background: "rgba(99,102,241,0.22)",
+                    border: "1px solid rgba(99,102,241,0.45)",
+                    color: "#c7d2fe",
                     fontSize: "11px",
-                    cursor: isBusy ? "not-allowed" : "pointer",
+                    fontWeight: 600,
+                    cursor: isBusy || !promptRecipe.trim() ? "not-allowed" : "pointer",
                   }}
                 >
-                  <span>Chat Copilot</span>
+                  <span>Send to Copilot</span>
                   <ArrowRight size={11} />
                 </button>
               </div>
