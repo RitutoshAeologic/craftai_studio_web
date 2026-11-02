@@ -12,7 +12,7 @@ const S = theme.colors;
 /* ── Categories matching specification ──────────────────────── */
 const CATEGORIES = [
   "All",
-  "Cyberpunk City",
+  "Cyberpunk",
   "Photorealism",
   "Anime",
   "Product",
