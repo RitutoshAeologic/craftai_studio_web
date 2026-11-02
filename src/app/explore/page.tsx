@@ -12,7 +12,7 @@ const S = theme.colors;
 /* ── Categories matching specification ──────────────────────── */
 const CATEGORIES = [
   "All",
-  "Cyberpunk",
+  "Cyberpunk City",
   "Photorealism",
   "Anime",
   "Product",
@@ -412,9 +412,8 @@ function GalleryCard({
   const explorePollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
   const [imgSrc, setImgSrc] = useState(
     item.image_url ||
-      `https://gen.pollinations.ai/image/${encP(item.prompt)}?model=flux&width=512&height=${
-        item.height || 360
-      }&seed=${item.seed}&nologo=true&key=${explorePollinationsKey}`
+    `https://gen.pollinations.ai/image/${encP(item.prompt)}?model=flux&width=512&height=${item.height || 360
+    }&seed=${item.seed}&nologo=true&key=${explorePollinationsKey}`
   );
 
   const displayH = item.height || 360;
