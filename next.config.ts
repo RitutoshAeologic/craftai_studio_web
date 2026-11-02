@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   allowedDevOrigins: [
     "cloth-flu-maintaining-acting.trycloudflare.com",
     "fiber-val-personnel-dui.trycloudflare.com",

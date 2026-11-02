@@ -5,6 +5,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { safeUUID } from "@/lib/utils/uuid";
 
 const rawBackendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -399,7 +400,7 @@ export async function compileChatDelta(
           // session_id is required by backend PromptDeltaRequest schema.
           // Callers should pass a stable UUID per Studio session so the backend
           // can track conversational context across turns.
-          session_id: params.session_id ?? crypto.randomUUID(),
+          session_id: params.session_id ?? safeUUID(),
           base_prompt: params.base_prompt,
           user_instruction: params.user_instruction,
           turn_count: params.turn_count ?? 1,

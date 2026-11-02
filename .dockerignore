@@ -1,0 +1,11 @@
+.git
+.idea
+.vscode
+.cursor
+node_modules
+.next
+*.log
+.env
+.env*.local
+README.md
+docs/

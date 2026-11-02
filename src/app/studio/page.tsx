@@ -25,6 +25,7 @@ import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supaba
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
 import { theme } from "@/lib/theme/themeGuard";
+import { safeUUID } from "@/lib/utils/uuid";
 
 /* ── Types & Constants ──────────────────────────────────────── */
 type Model = { id: ImageModel; label: string; version: string };
@@ -123,9 +124,7 @@ function StudioContent() {
   // Stable UUID identifying this copilot conversation session.
   // Required by backend PromptDeltaRequest.session_id (Field(...) — not nullable).
   // Generated once per component mount; persists for the lifetime of the Studio session.
-  const copilotSessionId = useRef<string>(
-    typeof crypto !== "undefined" ? crypto.randomUUID() : `session_${Date.now()}`
-  );
+  const copilotSessionId = useRef<string>(safeUUID());
   // Tracks how many delta turns have occurred in this session (max 5 per backend rule)
   const copilotTurnCount = useRef<number>(0);
   // Active RNG seed for image continuity across Chat Copilot iterations
