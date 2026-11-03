@@ -19,6 +19,7 @@ import {
   FolderHeart,
   Coins,
   Sliders,
+  Bookmark,
 } from "lucide-react";
 import { fetchGenerations, deleteGeneration, fetchWallet, isCreativeToolGeneration, type Generation } from "@/lib/supabase/db";
 import { useTheme } from "@/context/ThemeContext";
@@ -68,6 +69,7 @@ export default function AppDrawer() {
   const navItems = [
     { href: "/explore", label: "Explore Community", icon: LayoutGrid },
     { href: "/library", label: "Cloud Library", icon: FolderHeart },
+    { href: "/saved", label: "Saved Gallery", icon: Bookmark },
     { href: "/tools", label: "Creative Tools", icon: Sliders },
     { href: "/wallet", label: "Credits & Wallet", icon: Coins },
     { href: "/remix", label: "Remix Lab", icon: Wand2 },

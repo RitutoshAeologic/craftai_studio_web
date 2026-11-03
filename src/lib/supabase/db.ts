@@ -25,6 +25,7 @@ export interface Artwork {
 
 export interface Generation {
   id: string;
+  original_id?: string;
   prompt: string;
   image_url: string;
   model: string;
@@ -666,6 +667,7 @@ export async function publishArtwork(params: {
 
 /* ── Save Private Artwork / Bookmark ─────────────────────────── */
 export async function savePrivateArtwork(params: {
+  id?: string;
   prompt: string;
   image_url: string;
   model?: string;
@@ -674,7 +676,8 @@ export async function savePrivateArtwork(params: {
 }): Promise<Generation> {
   const cleanPrompt = (params.prompt || "").trim();
   const savedItem: Generation = {
-    id: `saved-${Date.now()}`,
+    id: params.id || `saved-${Date.now()}`,
+    original_id: params.id,
     prompt: cleanPrompt,
     image_url: params.image_url,
     model: params.model || "Flux Schnell",
@@ -686,7 +689,15 @@ export async function savePrivateArtwork(params: {
   if (typeof window !== "undefined") {
     try {
       const existing: Generation[] = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]");
-      const updated = [savedItem, ...existing.filter((item) => item.image_url !== savedItem.image_url)];
+      const updated = [
+        savedItem,
+        ...existing.filter(
+          (item) =>
+            item.image_url !== savedItem.image_url &&
+            item.id !== savedItem.id &&
+            (!params.id || (item.original_id !== params.id && item.id !== params.id))
+        ),
+      ];
       localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event("craftai_bookmarks_updated"));
     } catch {
@@ -706,6 +717,49 @@ export async function savePrivateArtwork(params: {
   }
 
   return savedItem;
+}
+
+/* ── Remove Saved Private Artwork / Bookmark ─────────────────── */
+export async function removePrivateArtwork(imageUrlOrId: string, userId?: string): Promise<void> {
+  if (typeof window !== "undefined") {
+    try {
+      const existing: Generation[] = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]");
+      const updated = existing.filter(
+        (item) =>
+          item.id !== imageUrlOrId &&
+          item.original_id !== imageUrlOrId &&
+          item.image_url !== imageUrlOrId
+      );
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("craftai_bookmarks_updated"));
+    } catch {}
+  }
+
+  const supabase = createClient();
+  if (supabase && userId && !userId.includes("default") && !userId.includes("@")) {
+    try {
+      await supabase.from("collection_items").delete().eq("user_id", userId).eq("image_url", imageUrlOrId);
+    } catch {}
+  }
+}
+
+export function isArtworkBookmarked(idOrUrl?: string, secondaryUrl?: string): boolean {
+  if (!idOrUrl && !secondaryUrl) return false;
+  if (typeof window !== "undefined") {
+    try {
+      const existing: Generation[] = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]");
+      return existing.some((item) => {
+        if (idOrUrl) {
+          if (item.id === idOrUrl || item.original_id === idOrUrl || item.image_url === idOrUrl) return true;
+        }
+        if (secondaryUrl) {
+          if (item.image_url === secondaryUrl || item.id === secondaryUrl || item.original_id === secondaryUrl) return true;
+        }
+        return false;
+      });
+    } catch {}
+  }
+  return false;
 }
 
 /* ── Fetch Saved Bookmarks (Synced to Supabase collection_items with local cache) ── */

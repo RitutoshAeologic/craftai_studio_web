@@ -21,6 +21,12 @@ import {
   type StructuredPromptMetadata,
 } from "@/lib/api/backend-client";
 import { PromptInspectorModal } from "@/components/studio/PromptInspectorModal";
+import ArtisticPresetDropdown from "@/components/studio/ArtisticPresetDropdown";
+import AspectRatioDropdown from "@/components/studio/AspectRatioDropdown";
+import StyleBoostersDropdown, { STYLE_BOOSTERS } from "@/components/studio/StyleBoostersDropdown";
+import { ARTISTIC_PRESETS, type ArtisticPreset } from "@/components/studio/ArtisticStylePresetBar";
+import PromptCopilotModal from "@/components/studio/PromptCopilotModal";
+import { useGeneration } from "@/context/GenerationContext";
 import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
@@ -60,17 +66,6 @@ const FALLBACK_LLM_ENGINES = [
   { id: "openai", label: "GPT-4o Mini" },
   { id: "claude", label: "Claude 3.5 Sonnet (Pro)" },
   { id: "local",  label: "Local (Offline Engine)" },
-];
-
-const STYLE_BOOSTERS = [
-  { label: "Cinematic Lighting", icon: "✨" },
-  { label: "Photorealistic 8K", icon: "📸" },
-  { label: "Cyberpunk Neon", icon: "🌆" },
-  { label: "Studio Ghibli Anime", icon: "🎨" },
-  { label: "Octane 3D Render", icon: "⚡" },
-  { label: "Volumetric Fog", icon: "🌫️" },
-  { label: "Unreal Engine 5", icon: "🎮" },
-  { label: "Holographic Glow", icon: "🔮" },
 ];
 
 const ANCHOR_TAGS = [
@@ -117,6 +112,8 @@ function StudioContent() {
   const queryImage = searchParams.get("imageUrl");
   const queryRemixId = searchParams.get("remixPromptId") || searchParams.get("remixId");
   const queryFaceLock = searchParams.get("faceLock") === "true";
+  const queryAspectRatio = searchParams.get("aspectRatio");
+  const queryPreset = searchParams.get("preset");
 
   const activeSessionId = useRef<string | null>(querySessionId);
   const remixedFromPromptId = useRef<string | null>(queryRemixId);
@@ -214,7 +211,30 @@ function StudioContent() {
     };
   });
 
-  const [ratio, setRatio] = useState<Ratio>(RATIOS[0]);
+  const { startBackgroundGeneration, isGenerating: isGlobalGenerating } = useGeneration();
+  const [selectedArtisticPreset, setSelectedArtisticPreset] = useState<ArtisticPreset>(() => {
+    if (queryPreset) {
+      const found = ARTISTIC_PRESETS.find((p) => p.id === queryPreset);
+      if (found) return found;
+    }
+    return ARTISTIC_PRESETS[0];
+  });
+  const [isCopilotModalOpen, setIsCopilotModalOpen] = useState(false);
+
+  const [ratio, setRatio] = useState<Ratio>(() => {
+    if (queryAspectRatio) {
+      const found = RATIOS.find((r) => r.id === queryAspectRatio);
+      if (found) return found;
+    }
+    return RATIOS[0];
+  });
+
+  const handleRatioSelect = (newRatioId: AspectRatio) => {
+    const found = RATIOS.find((r) => r.id === newRatioId);
+    if (found) {
+      setRatio(found);
+    }
+  };
 
   // Generation & Progress states
   const [generating, setGenerating] = useState(false);
@@ -224,7 +244,7 @@ function StudioContent() {
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  const isBusy = generating || imageLoading || isEnhancing;
+  const isBusy = generating || imageLoading || isEnhancing || isGlobalGenerating;
 
   // Prompt Formula States (Rule 4 DRM: Clean prompt displayed, armed recipe sent to FLUX)
   const [promptRecipe, setPromptRecipe] = useState(
@@ -705,6 +725,12 @@ function StudioContent() {
       } else if (faceUrls.length > 0) {
         promptToSend = `Featuring exact same character and scene composition: seamless modification into: ${clean}, maintaining subject likeness, photorealistic 8k`;
       }
+    }
+
+    // Apply Artistic Style Preset modifier if active
+    const presetModifier = selectedArtisticPreset.id !== "none" ? selectedArtisticPreset.modifier : "";
+    if (presetModifier && !promptToSend.toLowerCase().includes(presetModifier.toLowerCase())) {
+      promptToSend = `${promptToSend}, ${presetModifier}`;
     }
 
     try {
@@ -1665,42 +1691,48 @@ function StudioContent() {
 
           {/* ── BOTTOM CONTROLS & RECIPE INPUT ── */}
           <div style={{ flexShrink: 0, borderTop: `1px solid ${S.panelBorder}`, background: S.panel }}>
-            {/* Style Boosters */}
-            <div style={{ padding: "10px 16px 8px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
-                  Style Boosters
-                </span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-                {STYLE_BOOSTERS.map((booster) => {
-                  const isApplied = promptRecipe.toLowerCase().includes(booster.label.toLowerCase());
-                  return (
-                    <button
-                      key={booster.label}
-                      disabled={isBusy}
-                      onClick={() => toggleBooster(booster.label)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        padding: "4px 8px",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: 500,
-                        cursor: isBusy ? "not-allowed" : "pointer",
-                        opacity: isBusy ? 0.5 : 1,
-                        border: isApplied ? `1px solid ${S.cyan}` : `1px solid ${S.cardBorder}`,
-                        background: isApplied ? "rgba(0,212,255,0.14)" : "rgba(255,255,255,0.03)",
-                        color: isApplied ? S.cyan : "#cbd5e1",
-                      }}
-                    >
-                      <span>{booster.icon}</span>
-                      <span>{booster.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Studio Dropdowns Toolbar: Style Preset, Aspect Ratio & Frame, Style Boosters */}
+            <div
+              style={{
+                padding: "10px 16px 8px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+              }}
+            >
+              {/* 1. Artistic Style Preset Dropdown */}
+              <ArtisticPresetDropdown
+                selectedPresetId={selectedArtisticPreset.id}
+                onSelectPreset={setSelectedArtisticPreset}
+                disabled={isBusy}
+              />
+
+              {/* 2. Aspect Ratio & Frame Dropdown */}
+              <AspectRatioDropdown
+                selectedRatioId={ratio.id}
+                onSelectRatio={handleRatioSelect}
+                disabled={isBusy}
+              />
+
+              {/* 3. Style Boosters Dropdown */}
+              <StyleBoostersDropdown
+                activeBoosters={STYLE_BOOSTERS.map((b) => b.label).filter((label) =>
+                  promptRecipe.toLowerCase().includes(label.toLowerCase())
+                )}
+                onToggleBooster={toggleBooster}
+                onClearBoosters={() => {
+                  let cleaned = promptRecipe;
+                  STYLE_BOOSTERS.forEach((b) => {
+                    const esc = b.label.replace(/[-/\^+?.()|[\]{}]/g, "\$&");
+                    cleaned = cleaned.replace(new RegExp(`\\s*,?\\s*${esc}`, "gi"), "");
+                    cleaned = cleaned.replace(new RegExp(`${esc}\\s*,?\\s*`, "gi"), "");
+                  });
+                  setPromptRecipe(cleaned.trim());
+                }}
+                disabled={isBusy}
+              />
             </div>
 
             {/* Interactive Prompt Recipe Box */}
@@ -1898,6 +1930,30 @@ function StudioContent() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px", gap: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <button
+                    id="btn-open-copilot-modal"
+                    disabled={isBusy}
+                    onClick={() => setIsCopilotModalOpen(true)}
+                    title="Open Prompt Copilot (Conversational Refinement Mode)"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      background: "rgba(16, 185, 129, 0.15)",
+                      border: "1px solid rgba(16, 185, 129, 0.35)",
+                      color: "#6ee7b7",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: isBusy ? "not-allowed" : "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    <span>Copilot ✨</span>
+                  </button>
+
+                  <button
                     id="btn-enhance-prompt"
                     disabled={isBusy}
                     onClick={handleEnhance}
@@ -2027,6 +2083,24 @@ function StudioContent() {
         complexityScore={complexityScore}
         structuredMetadata={structuredMetadata}
         negativePrompt={negativePrompt}
+      />
+
+      {/* Prompt Copilot (Conversational Refinement Mode - Mobile Parity) */}
+      <PromptCopilotModal
+        isOpen={isCopilotModalOpen}
+        onClose={() => setIsCopilotModalOpen(false)}
+        initialPrompt={promptRecipe}
+        onApplyPrompt={(refined) => {
+          setPromptRecipe(refined);
+          setLastGeneratedPrompt(refined);
+        }}
+        onGenerateNow={(refined) => {
+          setPromptRecipe(refined);
+          setLastGeneratedPrompt(refined);
+          setIsCopilotModalOpen(false);
+          activeSeedRef.current = Math.floor(Math.random() * 900_000) + 100_000;
+          executeGenerate(refined, { isModification: false, seed: activeSeedRef.current });
+        }}
       />
     </div>
   );

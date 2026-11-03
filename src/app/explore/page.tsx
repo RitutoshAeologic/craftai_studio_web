@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo, useEffect } from "react";
-import { Search, Heart, ChevronDown, Wand2, X, ShieldCheck, Sparkles, Image as ImageIcon, Camera, Lock } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Search, Heart, ChevronDown, Wand2, X, ShieldCheck, Sparkles, Image as ImageIcon, Camera, Lock, Bookmark, Cpu } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { fetchArtworks, type Artwork } from "@/lib/supabase/db";
+import { fetchArtworks, savePrivateArtwork, removePrivateArtwork, isArtworkBookmarked, type Artwork } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
 
 /* ── Design tokens linked directly to Central Theme Guard ────── */
@@ -21,6 +21,9 @@ const CATEGORIES = [
   "3D Render",
 ];
 
+const MODELS_FILTER = ["All Models", "FLUX.1 Schnell", "SDXL Turbo", "Stable Diffusion XL"];
+const RATIOS_FILTER = ["All Ratios", "1:1 Square", "9:16 Story", "4:5 Portrait", "16:9 Cinema"];
+
 const SORT_OPTIONS = ["Trending Now", "Newest First", "Most Liked", "Most Remixed"];
 
 function encP(p: string) {
@@ -35,11 +38,15 @@ function CardDetailModal({
   onClose,
   onLikeToggle,
   isLiked,
+  onBookmarkToggle,
+  isBookmarked,
 }: {
   item: Artwork;
   onClose: () => void;
   onLikeToggle: (id: string) => void;
   isLiked: boolean;
+  onBookmarkToggle: (item: Artwork) => void;
+  isBookmarked: boolean;
 }) {
   const router = useRouter();
   const royaltyPercent = item.remix_fee && item.creator_royalty_cut
@@ -385,6 +392,31 @@ function CardDetailModal({
                   ⚡ Remix on My Photo
                 </button>
               </div>
+
+              {/* 4. Bookmark to Saved Gallery */}
+              <button
+                onClick={() => onBookmarkToggle(item)}
+                style={{
+                  marginTop: "10px",
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  padding: "10px",
+                  borderRadius: "10px",
+                  background: isBookmarked ? "rgba(0, 212, 255, 0.15)" : "rgba(255, 255, 255, 0.04)",
+                  border: isBookmarked ? "1px solid rgba(0, 212, 255, 0.45)" : `1px solid ${S.borderLight}`,
+                  color: isBookmarked ? S.cyan : S.textPrimary,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                <Bookmark size={14} style={{ fill: isBookmarked ? S.cyan : "none" }} />
+                {isBookmarked ? "Saved in Your Gallery (Tap to Remove)" : "Save to Saved Gallery"}
+              </button>
             </div>
           </div>
         </div>
@@ -401,12 +433,17 @@ function GalleryCard({
   onClick,
   onLikeToggle,
   isLiked,
+  onBookmarkToggle,
+  isBookmarked,
 }: {
   item: Artwork;
   onClick: () => void;
   onLikeToggle: (id: string) => void;
   isLiked: boolean;
+  onBookmarkToggle: (item: Artwork) => void;
+  isBookmarked: boolean;
 }) {
+  const router = useRouter();
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const explorePollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
@@ -416,7 +453,7 @@ function GalleryCard({
     }&seed=${item.seed}&nologo=true&key=${explorePollinationsKey}`
   );
 
-  const displayH = item.height || 360;
+  const displayH = Math.min(480, Math.max(280, item.height || 360));
   const fallback =
     item.fallback_url ||
     "https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop";
@@ -481,6 +518,7 @@ function GalleryCard({
           width: "100%",
           height: "100%",
           objectFit: "cover",
+          objectPosition: "center",
           display: "block",
           opacity: loaded ? 1 : 0,
           transition: "opacity 0.3s, transform 0.4s",
@@ -488,8 +526,13 @@ function GalleryCard({
         }}
       />
 
-      {/* Category Pill Top-Left */}
-      <div
+      {/* Category Pill Top-Left (Clickable to Category Screen) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/explore/category/${encodeURIComponent(item.category.toLowerCase())}`);
+        }}
+        title={`Explore all ${item.category} creations`}
         style={{
           position: "absolute",
           top: "10px",
@@ -502,42 +545,101 @@ function GalleryCard({
           fontWeight: 700,
           color: S.cyan,
           border: "1px solid rgba(0,212,255,0.3)",
-          zIndex: 2,
+          cursor: "pointer",
+          zIndex: 3,
+          transition: "transform 0.15s, border-color 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0,212,255,0.3)";
         }}
       >
         {item.category}
-      </div>
+      </button>
 
-      {/* Like Button Top-Right */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onLikeToggle(item.id);
-        }}
+      {/* Top-Right Action Controls (Bookmark & Like) */}
+      <div
         style={{
           position: "absolute",
           top: "10px",
           right: "10px",
           display: "flex",
           alignItems: "center",
-          gap: "5px",
-          padding: "4px 8px",
-          borderRadius: "6px",
-          background: "rgba(0,0,0,0.75)",
-          backdropFilter: "blur(6px)",
-          border: isLiked ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(255,255,255,0.1)",
-          cursor: "pointer",
-          color: isLiked ? "#ef4444" : "#9ca3af",
-          fontSize: "12px",
-          fontWeight: 600,
-          zIndex: 2,
-          opacity: hovered ? 1 : 0.75,
-          transition: "opacity 0.2s",
+          gap: "6px",
+          zIndex: 3,
         }}
       >
-        <Heart size={12} style={{ fill: isLiked ? "#ef4444" : "none" }} />
-        {(item.likes_count || 100) + (isLiked ? 1 : 0)}
-      </button>
+        {/* Bookmark / Save Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onBookmarkToggle(item);
+          }}
+          title={isBookmarked ? "Saved in your gallery (click to remove)" : "Save to gallery"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "30px",
+            height: "30px",
+            borderRadius: "7px",
+            background: isBookmarked ? "rgba(0, 212, 255, 0.28)" : "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(6px)",
+            border: isBookmarked ? "1.5px solid #00d4ff" : "1px solid rgba(255,255,255,0.18)",
+            cursor: "pointer",
+            color: isBookmarked ? "#00d4ff" : "#cbd5e1",
+            boxShadow: isBookmarked ? "0 0 14px rgba(0, 212, 255, 0.55)" : "none",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
+            (e.currentTarget as HTMLButtonElement).style.color = "#00d4ff";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = isBookmarked ? "#00d4ff" : "rgba(255,255,255,0.18)";
+            (e.currentTarget as HTMLButtonElement).style.color = isBookmarked ? "#00d4ff" : "#cbd5e1";
+          }}
+        >
+          <Bookmark
+            size={14}
+            style={{
+              fill: isBookmarked ? "#00d4ff" : "none",
+              stroke: isBookmarked ? "#00d4ff" : "currentColor",
+            }}
+          />
+        </button>
+
+        {/* Like Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onLikeToggle(item.id);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            padding: "4px 8px",
+            height: "28px",
+            borderRadius: "6px",
+            background: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(6px)",
+            border: isLiked ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(255,255,255,0.1)",
+            cursor: "pointer",
+            color: isLiked ? "#ef4444" : "#9ca3af",
+            fontSize: "12px",
+            fontWeight: 600,
+            transition: "all 0.15s",
+          }}
+        >
+          <Heart size={12} style={{ fill: isLiked ? "#ef4444" : "none" }} />
+          {(item.likes_count || 100) + (isLiked ? 1 : 0)}
+        </button>
+      </div>
 
       {/* Hover Overlay */}
       <div
@@ -601,25 +703,118 @@ function GalleryCard({
    MAIN EXPLORE PAGE COMPONENT
 ═══════════════════════════════════════════════════════════════ */
 export default function ExplorePage() {
+  const router = useRouter();
   const [items, setItems] = useState<Artwork[]>([]);
   const [category, setCategory] = useState("All");
+  const [selectedModel, setSelectedModel] = useState("All Models");
+  const [selectedRatio, setSelectedRatio] = useState("All Ratios");
+  const [modelFilterOpen, setModelFilterOpen] = useState(false);
+  const [ratioFilterOpen, setRatioFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState("Trending Now");
   const [sortOpen, setSortOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+  const [bookmarkedMap, setBookmarkedMap] = useState<Record<string, boolean>>({});
+  const filterToolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchArtworks().then(setItems);
+    function handleClickOutside(event: MouseEvent) {
+      if (filterToolbarRef.current && !filterToolbarRef.current.contains(event.target as Node)) {
+        setModelFilterOpen(false);
+        setRatioFilterOpen(false);
+        setSortOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const syncBookmarks = (artworksList: Artwork[]) => {
+    const bMap: Record<string, boolean> = {};
+    artworksList.forEach((item) => {
+      bMap[item.id] = isArtworkBookmarked(item.id, item.image_url);
+    });
+    setBookmarkedMap(bMap);
+  };
+
+  useEffect(() => {
+    fetchArtworks().then((data) => {
+      setItems(data);
+      syncBookmarks(data);
+    });
+
+    const handleUpdate = () => {
+      setItems((currentItems) => {
+        syncBookmarks(currentItems);
+        return currentItems;
+      });
+    };
+
+    window.addEventListener("craftai_bookmarks_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("craftai_bookmarks_updated", handleUpdate);
+    };
   }, []);
 
   const handleLikeToggle = (id: string) => {
     setLikedMap((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleBookmarkToggle = (item: Artwork) => {
+    const isSaved = Boolean(bookmarkedMap[item.id]);
+    if (isSaved) {
+      removePrivateArtwork(item.id);
+      removePrivateArtwork(item.image_url);
+      setBookmarkedMap((prev) => ({ ...prev, [item.id]: false }));
+    } else {
+      savePrivateArtwork({
+        id: item.id,
+        prompt: item.prompt || item.title,
+        image_url: item.image_url,
+        model: item.model,
+        aspect_ratio: item.aspect_ratio || "1:1",
+      });
+      setBookmarkedMap((prev) => ({ ...prev, [item.id]: true }));
+    }
+  };
+
   const filtered = useMemo(() => {
     let result = items;
     if (category !== "All") result = result.filter((i) => i.category.toLowerCase() === category.toLowerCase());
+
+    if (selectedModel !== "All Models") {
+      result = result.filter((i) => {
+        const itemModel = (i.model || "").toLowerCase();
+        const target = selectedModel.toLowerCase();
+        if (target.includes("flux")) return itemModel.includes("flux");
+        if (target.includes("turbo")) return itemModel.includes("turbo");
+        if (target.includes("sdxl") || target.includes("stable diffusion")) return itemModel.includes("sdxl") || itemModel.includes("stable");
+        return true;
+      });
+    }
+
+    if (selectedRatio !== "All Ratios") {
+      result = result.filter((i) => {
+        const r = (i.aspect_ratio || "").toLowerCase();
+        if (selectedRatio.includes("1:1")) {
+          return r.includes("1:1") || (!i.aspect_ratio && (!i.height || i.height === 360));
+        }
+        if (selectedRatio.includes("9:16")) {
+          return r.includes("9:16") || (i.height && i.height >= 480);
+        }
+        if (selectedRatio.includes("4:5")) {
+          return r.includes("4:5") || (i.height && i.height > 360 && i.height < 480);
+        }
+        if (selectedRatio.includes("16:9")) {
+          return r.includes("16:9") || (i.width && i.height && i.width > i.height);
+        }
+        return true;
+      });
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -632,7 +827,7 @@ export default function ExplorePage() {
     if (sortBy === "Most Liked") result = [...result].sort((a, b) => b.likes_count - a.likes_count);
     if (sortBy === "Most Remixed") result = [...result].sort((a, b) => (b.remix_count || 0) - (a.remix_count || 0));
     return result;
-  }, [items, category, sortBy, searchQuery]);
+  }, [items, category, selectedModel, selectedRatio, sortBy, searchQuery]);
 
   const [colCount, setColCount] = useState(4);
 
@@ -662,24 +857,23 @@ export default function ExplorePage() {
       {/* ── Top Filter Bar ───────────────────────────────────── */}
       <div
         style={{
-          padding: "14px clamp(12px, 3vw, 24px)",
           borderBottom: `1px solid ${S.cardBorder}`,
           background: S.bg,
+          padding: "14px clamp(12px, 3vw, 24px)",
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
           gap: "12px",
-          flexWrap: "wrap",
         }}
       >
-        {/* Category pills with horizontal scroll */}
+        {/* Tier 1: Horizontal Category Pills Bar */}
         <div
           style={{
             display: "flex",
+            alignItems: "center",
             gap: "8px",
             overflowX: "auto",
-            maxWidth: "100%",
-            paddingBottom: "4px",
             scrollbarWidth: "none",
+            paddingBottom: "2px",
           }}
         >
           {CATEGORIES.map((cat) => (
@@ -706,21 +900,18 @@ export default function ExplorePage() {
           ))}
         </div>
 
-        <div style={{ flex: 1, minWidth: "12px" }} />
-
-        {/* Search & Sort Wrap Container */}
+        {/* Tier 2: Search on Left + Filter Dropdowns on Right (Aligned on single clean row) */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            justifyContent: "space-between",
+            gap: "12px",
             flexWrap: "wrap",
-            flex: "1 1 280px",
-            justifyContent: "flex-end",
           }}
         >
-          {/* Search */}
-          <div style={{ position: "relative", flex: "1 1 180px", minWidth: "180px" }}>
+          {/* Left: Search */}
+          <div style={{ position: "relative", width: "min(340px, 100%)", flex: "1 1 240px" }}>
             <Search
               size={14}
               style={{
@@ -739,7 +930,8 @@ export default function ExplorePage() {
               placeholder="Search community creations..."
               style={{
                 width: "100%",
-                padding: "8px 14px 8px 36px",
+                height: "36px",
+                padding: "0 14px 0 36px",
                 background: S.card,
                 border: `1px solid ${S.borderLight}`,
                 borderRadius: "9999px",
@@ -751,66 +943,304 @@ export default function ExplorePage() {
             />
           </div>
 
-          {/* Sort Dropdown */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              id="explore-sort-btn"
-              onClick={() => setSortOpen(!sortOpen)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                background: S.card,
-                border: `1px solid ${S.borderLight}`,
-                borderRadius: "9999px",
-                cursor: "pointer",
-                color: S.textPrimary,
-                fontSize: "12px",
-                fontWeight: 500,
-              }}
-            >
-              {sortBy}
-              <ChevronDown size={13} style={{ color: S.textSecondary }} />
-            </button>
-            {sortOpen && (
-              <div
+          {/* Right: Dropdowns Group (Models, Aspect Ratio, Sort) - No overflow clipping! */}
+          <div
+            ref={filterToolbarRef}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+              position: "relative",
+              zIndex: 50,
+            }}
+          >
+            {/* Models Filter Dropdown */}
+            <div style={{ position: "relative" }}>
+              <button
+                id="filter-model-btn"
+                type="button"
+                onClick={() => {
+                  setModelFilterOpen(!modelFilterOpen);
+                  setRatioFilterOpen(false);
+                  setSortOpen(false);
+                }}
                 style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  right: 0,
-                  background: S.card,
-                  border: `1px solid ${S.borderLight}`,
-                  borderRadius: "10px",
-                  overflow: "hidden",
-                  zIndex: 100,
-                  minWidth: "160px",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  height: "36px",
+                  padding: "0 14px",
+                  background: selectedModel !== "All Models" ? "rgba(0, 212, 255, 0.12)" : S.card,
+                  border: selectedModel !== "All Models" ? "1px solid rgba(0, 212, 255, 0.45)" : `1px solid ${S.borderLight}`,
+                  borderRadius: "9999px",
+                  cursor: "pointer",
+                  color: selectedModel !== "All Models" ? S.cyan : S.textPrimary,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s",
                 }}
               >
-                {SORT_OPTIONS.map((o) => (
-                  <button
-                    key={o}
-                    onClick={() => {
-                      setSortBy(o);
-                      setSortOpen(false);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 14px",
-                      background: sortBy === o ? "rgba(99,102,241,0.15)" : "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      color: sortBy === o ? S.cyan : S.textPrimary,
-                      fontSize: "13px",
-                    }}
-                  >
-                    {o}
-                  </button>
-                ))}
-              </div>
-            )}
+                <Cpu size={13} style={{ color: selectedModel !== "All Models" ? S.cyan : S.textSecondary }} />
+                <span>{selectedModel}</span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    color: S.textSecondary,
+                    transition: "transform 0.2s",
+                    transform: modelFilterOpen ? "rotate(180deg)" : "none",
+                  }}
+                />
+              </button>
+              {modelFilterOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    background: "#121722",
+                    border: "1px solid #222f4c",
+                    borderRadius: "12px",
+                    padding: "4px",
+                    zIndex: 1000,
+                    minWidth: "190px",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.85), 0 0 0 1px rgba(0, 212, 255, 0.12)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  {MODELS_FILTER.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setSelectedModel(m);
+                        setModelFilterOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        background: selectedModel === m ? "rgba(0, 212, 255, 0.12)" : "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: selectedModel === m ? S.cyan : S.textPrimary,
+                        fontSize: "12.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        transition: "background 0.12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedModel !== m) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedModel !== m) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                        }
+                      }}
+                    >
+                      <span>{m}</span>
+                      {selectedModel === m && <span style={{ color: S.cyan }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Aspect Ratio Filter Dropdown */}
+            <div style={{ position: "relative" }}>
+              <button
+                id="filter-ratio-btn"
+                type="button"
+                onClick={() => {
+                  setRatioFilterOpen(!ratioFilterOpen);
+                  setModelFilterOpen(false);
+                  setSortOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  height: "36px",
+                  padding: "0 14px",
+                  background: selectedRatio !== "All Ratios" ? "rgba(168, 85, 247, 0.12)" : S.card,
+                  border: selectedRatio !== "All Ratios" ? "1px solid rgba(168, 85, 247, 0.45)" : `1px solid ${S.borderLight}`,
+                  borderRadius: "9999px",
+                  cursor: "pointer",
+                  color: selectedRatio !== "All Ratios" ? "#c084fc" : S.textPrimary,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s",
+                }}
+              >
+                <Camera size={13} style={{ color: selectedRatio !== "All Ratios" ? "#c084fc" : S.textSecondary }} />
+                <span>{selectedRatio}</span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    color: S.textSecondary,
+                    transition: "transform 0.2s",
+                    transform: ratioFilterOpen ? "rotate(180deg)" : "none",
+                  }}
+                />
+              </button>
+              {ratioFilterOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    background: "#121722",
+                    border: "1px solid #222f4c",
+                    borderRadius: "12px",
+                    padding: "4px",
+                    zIndex: 1000,
+                    minWidth: "170px",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.85), 0 0 0 1px rgba(168, 85, 247, 0.15)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  {RATIOS_FILTER.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRatio(r);
+                        setRatioFilterOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        background: selectedRatio === r ? "rgba(168, 85, 247, 0.15)" : "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: selectedRatio === r ? "#c084fc" : S.textPrimary,
+                        fontSize: "12.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        transition: "background 0.12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedRatio !== r) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedRatio !== r) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                        }
+                      }}
+                    >
+                      <span>{r}</span>
+                      {selectedRatio === r && <span style={{ color: "#c084fc" }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div style={{ position: "relative" }}>
+              <button
+                id="explore-sort-btn"
+                type="button"
+                onClick={() => {
+                  setSortOpen(!sortOpen);
+                  setModelFilterOpen(false);
+                  setRatioFilterOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  height: "36px",
+                  padding: "0 16px",
+                  background: S.card,
+                  border: `1px solid ${S.borderLight}`,
+                  borderRadius: "9999px",
+                  cursor: "pointer",
+                  color: S.textPrimary,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s",
+                }}
+              >
+                <span>{sortBy}</span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    color: S.textSecondary,
+                    transition: "transform 0.2s",
+                    transform: sortOpen ? "rotate(180deg)" : "none",
+                  }}
+                />
+              </button>
+              {sortOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    background: "#121722",
+                    border: "1px solid #222f4c",
+                    borderRadius: "12px",
+                    padding: "4px",
+                    zIndex: 1000,
+                    minWidth: "160px",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.85)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => {
+                        setSortBy(o);
+                        setSortOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        background: sortBy === o ? "rgba(99,102,241,0.15)" : "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: sortBy === o ? S.cyan : S.textPrimary,
+                        fontSize: "12.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        transition: "background 0.12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (sortBy !== o) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (sortBy !== o) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                        }
+                      }}
+                    >
+                      <span>{o}</span>
+                      {sortBy === o && <span style={{ color: S.cyan }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -832,9 +1262,11 @@ export default function ExplorePage() {
               <GalleryCard
                 key={item.id}
                 item={item}
-                onClick={() => setSelectedArtwork(item)}
+                onClick={() => router.push(`/explore/${item.id}`)}
                 onLikeToggle={handleLikeToggle}
                 isLiked={Boolean(likedMap[item.id])}
+                onBookmarkToggle={handleBookmarkToggle}
+                isBookmarked={Boolean(bookmarkedMap[item.id])}
               />
             ))}
           </div>
@@ -848,6 +1280,8 @@ export default function ExplorePage() {
           onClose={() => setSelectedArtwork(null)}
           onLikeToggle={handleLikeToggle}
           isLiked={Boolean(likedMap[selectedArtwork.id])}
+          onBookmarkToggle={handleBookmarkToggle}
+          isBookmarked={Boolean(bookmarkedMap[selectedArtwork.id])}
         />
       )}
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -10,9 +10,16 @@ import {
   Globe,
   Paperclip,
   Wand2,
-  Cpu
+  Cpu,
+  ChevronDown,
 } from "lucide-react";
 import { saveGeneration } from "@/lib/supabase/db";
+import PromptCopilotModal from "@/components/studio/PromptCopilotModal";
+import { ARTISTIC_PRESETS, type ArtisticPreset } from "@/components/studio/ArtisticStylePresetBar";
+import ArtisticPresetDropdown from "@/components/studio/ArtisticPresetDropdown";
+import AspectRatioDropdown from "@/components/studio/AspectRatioDropdown";
+import StyleBoostersDropdown, { STYLE_BOOSTERS } from "@/components/studio/StyleBoostersDropdown";
+import { type AspectRatio } from "@/lib/api/generate";
 
 const QUICK_PROMPTS = [
   {
@@ -49,15 +56,59 @@ export default function HomePage() {
   const [engine, setEngine] = useState(ENGINES[0]);
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const [autoEnhance, setAutoEnhance] = useState(true);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<ArtisticPreset>(ARTISTIC_PRESETS[0]);
+  const [selectedRatio, setSelectedRatio] = useState<AspectRatio>("1:1");
+  const [activeBoosters, setActiveBoosters] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const engineMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (engineMenuRef.current && !engineMenuRef.current.contains(event.target as Node)) {
+        setEngineMenuOpen(false);
+      }
+    }
+    if (engineMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [engineMenuOpen]);
+
+  const handleToggleBooster = (label: string) => {
+    setActiveBoosters((prev) =>
+      prev.includes(label) ? prev.filter((b) => b !== label) : [...prev, label]
+    );
+  };
+
+  const handleClearBoosters = () => {
+    setActiveBoosters([]);
+  };
 
   async function handleSubmit(selectedPrompt?: string) {
     const textToUse = selectedPrompt || prompt;
     if (!textToUse.trim() || submitting) return;
 
     setSubmitting(true);
-    // Seamlessly transition to Studio with prompt query parameter
-    router.push(`/studio?prompt=${encodeURIComponent(textToUse.trim())}&engine=${engine.id}&autoGen=true`);
+    const presetModifier = selectedPreset.id !== "none" ? selectedPreset.modifier : "";
+    const boosterModifiers = activeBoosters
+      .map((b) => STYLE_BOOSTERS.find((sb) => sb.label === b)?.modifier || b)
+      .join(", ");
+
+    let finalPrompt = textToUse.trim();
+    if (presetModifier && !finalPrompt.toLowerCase().includes(presetModifier.toLowerCase())) {
+      finalPrompt = `${finalPrompt}, ${presetModifier}`;
+    }
+    if (boosterModifiers && !finalPrompt.toLowerCase().includes(boosterModifiers.toLowerCase())) {
+      finalPrompt = `${finalPrompt}, ${boosterModifiers}`;
+    }
+
+    // Seamlessly transition to Studio with prompt, engine, aspect ratio, preset, and boosters
+    router.push(
+      `/studio?prompt=${encodeURIComponent(finalPrompt)}&engine=${engine.id}&aspectRatio=${selectedRatio}&preset=${selectedPreset.id}&autoGen=true`
+    );
   }
 
   return (
@@ -95,7 +146,7 @@ export default function HomePage() {
             fontWeight: 700,
             color: "#ffffff",
             letterSpacing: "-0.02em",
-            marginBottom: "clamp(20px, 3vw, 32px)",
+            marginBottom: "clamp(20px, 3vw, 24px)",
             fontFamily: "var(--font-outfit, Outfit, sans-serif)",
           }}
         >
@@ -148,79 +199,133 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Bottom control pills row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "4px", flexWrap: "wrap", gap: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              {/* Engine Selector Dropdown */}
-              <div style={{ position: "relative" }}>
-                <button
-                  type="button"
-                  onClick={() => setEngineMenuOpen(!engineMenuOpen)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "6px 12px",
-                    borderRadius: "9999px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid #1e2533",
-                    color: "#cbd5e1",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff"}
-                  onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533"}
-                >
-                  <Cpu size={13} style={{ color: "#00d4ff" }} />
-                  <span>{engine.label}</span>
-                </button>
-
-                {engineMenuOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "calc(100% + 8px)",
-                      left: 0,
-                      background: "#161d2b",
-                      border: "1px solid #222f4c",
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      zIndex: 100,
-                      boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
-                      minWidth: "150px",
-                    }}
-                  >
-                    {ENGINES.map((e) => (
-                      <button
-                        key={e.id}
-                        type="button"
-                        onClick={() => {
-                          setEngine(e);
-                          setEngineMenuOpen(false);
-                        }}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "8px 14px",
-                          background: engine.id === e.id ? "rgba(0, 212, 255, 0.1)" : "transparent",
-                          color: engine.id === e.id ? "#00d4ff" : "#cbd5e1",
-                          border: "none",
-                          fontSize: "13px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {e.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Auto-Enhance Toggle Pill */}
+          {/* Row 1: Generation Settings & Parameter Tiles */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+              paddingTop: "4px",
+            }}
+          >
+            {/* 1. Engine Selector Dropdown */}
+            <div ref={engineMenuRef} style={{ position: "relative" }}>
               <button
                 type="button"
+                id="btn-engine-dropdown"
+                onClick={() => setEngineMenuOpen(!engineMenuOpen)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "9999px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid #1e2533",
+                  color: "#cbd5e1",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff"}
+                onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533"}
+              >
+                <Cpu size={13} style={{ color: "#00d4ff" }} />
+                <span>{engine.label}</span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    color: "#94a3b8",
+                    transition: "transform 0.2s",
+                    transform: engineMenuOpen ? "rotate(180deg)" : "none",
+                  }}
+                />
+              </button>
+
+              {engineMenuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "calc(100% + 8px)",
+                    left: 0,
+                    background: "#161d2b",
+                    border: "1px solid #222f4c",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    zIndex: 100,
+                    boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+                    minWidth: "150px",
+                  }}
+                >
+                  {ENGINES.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => {
+                        setEngine(e);
+                        setEngineMenuOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "8px 14px",
+                        background: engine.id === e.id ? "rgba(0, 212, 255, 0.1)" : "transparent",
+                        color: engine.id === e.id ? "#00d4ff" : "#cbd5e1",
+                        border: "none",
+                        fontSize: "13px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 2. Artistic Style Preset Dropdown */}
+            <ArtisticPresetDropdown
+              selectedPresetId={selectedPreset.id}
+              onSelectPreset={setSelectedPreset}
+              disabled={submitting}
+            />
+
+            {/* 3. Aspect Ratio & Frame Dropdown */}
+            <AspectRatioDropdown
+              selectedRatioId={selectedRatio}
+              onSelectRatio={setSelectedRatio}
+              disabled={submitting}
+            />
+
+            {/* 4. Style Boosters Dropdown */}
+            <StyleBoostersDropdown
+              activeBoosters={activeBoosters}
+              onToggleBooster={handleToggleBooster}
+              onClearBoosters={handleClearBoosters}
+              disabled={submitting}
+            />
+          </div>
+
+          {/* Row 2: Prompt AI Assistance Tools & Submit Action */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
+              paddingTop: "8px",
+              borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+            }}
+          >
+            {/* Left AI Tools: Auto-Enhance and Copilot */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {/* 5. Auto-Enhance Toggle Pill */}
+              <button
+                type="button"
+                id="btn-auto-enhance"
                 onClick={() => setAutoEnhance(!autoEnhance)}
                 style={{
                   display: "flex",
@@ -235,14 +340,41 @@ export default function HomePage() {
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.15s",
+                  whiteSpace: "nowrap",
                 }}
               >
                 <Wand2 size={13} />
                 <span>Auto-Enhance {autoEnhance ? "On" : "Off"}</span>
               </button>
+
+              {/* 6. Prompt Copilot Button */}
+              <button
+                type="button"
+                id="btn-prompt-copilot"
+                onClick={() => setIsCopilotOpen(true)}
+                title="Open Prompt Copilot (Conversational Refinement Mode)"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "9999px",
+                  background: "rgba(16, 185, 129, 0.12)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  color: "#6ee7b7",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Sparkles size={13} />
+                <span>Copilot ✨</span>
+              </button>
             </div>
 
-            {/* Submit Arrow Button */}
+            {/* Right: Submit Arrow Button */}
             <button
               id="home-submit-btn"
               type="button"
@@ -261,6 +393,7 @@ export default function HomePage() {
                 color: prompt.trim() && !submitting ? "#000000" : "#64748b",
                 transition: "all 0.15s",
                 boxShadow: prompt.trim() && !submitting ? "0 0 16px rgba(0, 212, 255, 0.4)" : "none",
+                flexShrink: 0,
               }}
             >
               <ArrowUp size={16} strokeWidth={2.5} />
@@ -335,6 +468,28 @@ export default function HomePage() {
           })}
         </div>
       </div>
+
+      {/* Prompt Copilot (Conversational Refinement Mode) */}
+      <PromptCopilotModal
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        initialPrompt={prompt}
+        onApplyPrompt={(refined) => {
+          setPrompt(refined);
+        }}
+        onGenerateNow={(refined) => {
+          setPrompt(refined);
+          setIsCopilotOpen(false);
+          const presetModifier = selectedPreset.id !== "none" ? selectedPreset.modifier : "";
+          let finalPrompt = refined.trim();
+          if (presetModifier && !finalPrompt.toLowerCase().includes(presetModifier.toLowerCase())) {
+            finalPrompt = `${finalPrompt}, ${presetModifier}`;
+          }
+          router.push(
+            `/studio?prompt=${encodeURIComponent(finalPrompt)}&engine=${engine.id}&aspectRatio=${selectedRatio}&preset=${selectedPreset.id}&autoGen=true`
+          );
+        }}
+      />
     </div>
   );
 }

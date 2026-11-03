@@ -5,8 +5,10 @@ import { DrawerProvider } from "@/context/DrawerContext";
 import { UserProvider } from "@/context/UserContext";
 import { LLMConfigProvider } from "@/context/LLMConfigContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { GenerationProvider } from "@/context/GenerationContext";
 import AppDrawer from "./AppDrawer";
 import TopBar from "./TopBar";
+import GlobalGenerationToast from "./GlobalGenerationToast";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -25,21 +27,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             the bearer JWT when calling the config endpoint. */}
         <LLMConfigProvider>
           <DrawerProvider>
-            <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", background: "var(--theme-background, #0b0b0f)" }}>
-            {/* Leftmost Collapsible Sidebar Drawer */}
-            <AppDrawer />
+            <GenerationProvider>
+              <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", background: "var(--theme-background, #0b0b0f)" }}>
+                {/* Leftmost Collapsible Sidebar Drawer */}
+                <AppDrawer />
 
-            {/* Right Main Content Area */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, height: "100vh", overflow: "hidden" }}>
-              <TopBar />
-              <div style={{ flex: 1, overflowY: "auto", position: "relative", display: "flex", flexDirection: "column" }}>
-                {children}
+                {/* Right Main Content Area */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, height: "100vh", overflow: "hidden" }}>
+                  <TopBar />
+                  <div style={{ flex: 1, overflowY: "auto", position: "relative", display: "flex", flexDirection: "column" }}>
+                    {children}
+                  </div>
+                </div>
+
+                {/* Global Safeguard Generation Toast */}
+                <GlobalGenerationToast />
               </div>
-            </div>
-          </div>
-        </DrawerProvider>
-      </LLMConfigProvider>
-    </UserProvider>
-  </ThemeProvider>
-);
+            </GenerationProvider>
+          </DrawerProvider>
+        </LLMConfigProvider>
+      </UserProvider>
+    </ThemeProvider>
+  );
 }
