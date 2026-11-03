@@ -37,6 +37,8 @@ import { toolsApi, type ToolHistoryItem, type BaseToolResponse } from "@/lib/api
 import { ToolHistoryModal } from "@/components/tools/ToolHistoryModal";
 import { MagicObjectEraser } from "@/components/tools/MagicObjectEraser";
 import { PhotoColorizer } from "@/components/tools/PhotoColorizer";
+import { MagicGrabTool } from "@/components/tools/MagicGrabTool";
+import { type ProductPackResponse } from "@/lib/api/toolsApi";
 import { saveGeneration } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
 
@@ -44,6 +46,7 @@ const S = theme.colors;
 
 type ToolTab =
   | "cutout"
+  | "magic_grab"
   | "object_eraser"
   | "colorizer"
   | "ai_background"
@@ -224,6 +227,7 @@ function ToolsContent() {
   const { user, profile } = useUser();
 
   const parseInitialTab = (): ToolTab => {
+    if (queryAction === "magic_grab" || queryAction === "grab") return "magic_grab";
     if (queryAction === "object_eraser" || queryAction === "erase" || queryAction === "remove-object") return "object_eraser";
     if (queryAction === "colorizer" || queryAction === "colorize") return "colorizer";
     if (queryAction === "ai_background" || queryAction === "background") return "ai_background";
@@ -242,6 +246,7 @@ function ToolsContent() {
     const initialTab = parseInitialTab();
     const map: Record<ToolTab, string | null> = {
       cutout: null,
+      magic_grab: null,
       object_eraser: null,
       colorizer: null,
       ai_background: null,
@@ -261,6 +266,7 @@ function ToolsContent() {
 
   const [tabOutputs, setTabOutputs] = useState<Record<ToolTab, string | null>>({
     cutout: null,
+    magic_grab: null,
     object_eraser: null,
     colorizer: null,
     ai_background: null,
@@ -306,7 +312,21 @@ function ToolsContent() {
   const [prodRatio, setProdRatio] = useState<string>("4:5");
   const [prodLang, setProdLang] = useState<string>("English");
 
-  // Marketing Poster State
+  // Harmonization & Expansion States
+  const [harmonizeLighting, setHarmonizeLighting] = useState<boolean>(true);
+  const [expandAlignment, setExpandAlignment] = useState<"auto" | "center" | "left" | "right">("auto");
+  const [expandPrompt, setExpandPrompt] = useState<string>("");
+
+  // Product Pack State (4-Pack Listing Suite)
+  const [productPackResult, setProductPackResult] = useState<ProductPackResponse | null>(null);
+  const [isGeneratingPack, setIsGeneratingPack] = useState<boolean>(false);
+
+  // Marketing Poster Extra States
+  const [posterSubtext, setPosterSubtext] = useState<string>("");
+  const [posterDiscount, setPosterDiscount] = useState<string>("");
+  const [posterTheme, setPosterTheme] = useState<string>("bold_sale");
+
+    // Marketing Poster State
   const [posterTopic, setPosterTopic] = useState<string>("Summer Cold Brew Iced Coffee Launch");
   const [posterHeadline, setPosterHeadline] = useState<string>("Cold. Bold. Refreshing.");
   const [posterCategory, setPosterCategory] = useState<string>("Commercial");
@@ -438,7 +458,53 @@ function ToolsContent() {
     }
   };
 
-  /* ── Unified Tool Execution Handler ────────────────────────── */
+  /* ── E-Commerce 4-Pack Suite Generator ──────────────────────── */
+  const handleGenerateProductPack = async () => {
+    if (!sourceImage || isProcessing || isGeneratingPack) return;
+    setIsGeneratingPack(true);
+    setErrorMessage(null);
+
+    try {
+      const packRes = await toolsApi.generateProductPack({
+        imageUrl: sourceImage,
+        productName: productName.trim() || "Commercial Product",
+        aspectRatio: prodRatio,
+        language: prodLang,
+        harmonizeLighting,
+        userId: user?.id,
+      });
+
+      setProductPackResult(packRes);
+      const heroUrl = packRes.studio_pedestal_url || packRes.amazon_white_url || packRes.all_urls[0];
+      if (heroUrl) {
+        setToolOutput(heroUrl);
+        setViewMode("result");
+      }
+
+      if (heroUrl) {
+        saveGeneration(
+          {
+            prompt: `E-Commerce 4-Pack Listing (${productName || "Product Listing"})`,
+            image_url: heroUrl,
+            model: "TOOL_PRODUCT_PACK",
+            aspect_ratio: "4:5",
+            user_id: user?.id,
+            user_email: profile.email,
+            credits_deducted: 0,
+            type: "TOOL_GEN",
+          },
+          user?.id || profile.email
+        ).catch(() => {});
+      }
+    } catch (err: any) {
+      console.error("Product pack failed:", err);
+      setErrorMessage(err?.message || "Failed to generate 4-pack listing.");
+    } finally {
+      setIsGeneratingPack(false);
+    }
+  };
+
+    /* ── Unified Tool Execution Handler ────────────────────────── */
   const handleExecuteActiveTool = async () => {
     if (!sourceImage || isProcessing) return;
     setIsProcessing(true);
@@ -460,6 +526,7 @@ function ToolsContent() {
           customBackdrop: bgMode === "custom" ? customBackdrop : undefined,
           aspectRatio: bgRatio,
           quality: bgQuality,
+          harmonizeLighting,
           userId: user?.id,
         });
         const url = res.output_url || res.image_url;
@@ -470,6 +537,8 @@ function ToolsContent() {
         res = await toolsApi.expandImage({
           imageUrl: sourceImage,
           targetRatio: expandRatio,
+          alignment: expandAlignment,
+          prompt: expandPrompt.trim() || undefined,
           quality: expandQuality,
           userId: user?.id,
         });
@@ -503,6 +572,7 @@ function ToolsContent() {
           productName: productName.trim() || "Commercial Product",
           aspectRatio: prodRatio,
           language: prodLang,
+          harmonizeLighting,
           userId: user?.id,
         });
         const url = res.output_url || res.image_url;
@@ -514,6 +584,9 @@ function ToolsContent() {
           topic: posterTopic.trim() || "Promotional Launch",
           category: posterCategory,
           headline: posterHeadline.trim() || undefined,
+          subtext: posterSubtext.trim() || undefined,
+          discountBadge: posterDiscount.trim() || undefined,
+          theme: posterTheme,
           aspectRatio: posterRatio,
           quality: posterQuality,
           userId: user?.id,
@@ -722,6 +795,27 @@ function ToolsContent() {
           </button>
 
           <button
+            onClick={() => { setActiveTab("magic_grab"); setViewMode("result"); }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 14px",
+              borderRadius: "10px",
+              background: activeTab === "magic_grab" ? "rgba(0, 212, 255, 0.22)" : S.card,
+              border: activeTab === "magic_grab" ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
+              color: activeTab === "magic_grab" ? "#ffffff" : S.textSecondary,
+              fontSize: "12.5px",
+              fontWeight: activeTab === "magic_grab" ? 700 : 500,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Scissors size={15} style={{ color: S.cyan }} />
+            <span>Magic Grab (Canva Style - Free)</span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab("object_eraser"); }}
             style={{
               display: "flex",
@@ -923,7 +1017,16 @@ function ToolsContent() {
         )}
 
         {/* ── Main Workspace Grid ─────────────────────────────── */}
-        {activeTab === "object_eraser" ? (
+        {activeTab === "magic_grab" ? (
+          <MagicGrabTool
+            initialImageUrl={tabImages.magic_grab || undefined}
+            onImageChange={(url) => setTabImages((prev) => ({ ...prev, magic_grab: url }))}
+            onSavedToLibrary={(cutoutUrl) => {
+              setTabOutputs((prev) => ({ ...prev, magic_grab: cutoutUrl }));
+              setToolOutput(cutoutUrl);
+            }}
+          />
+        ) : activeTab === "object_eraser" ? (
           <MagicObjectEraser
             initialImageUrl={tabImages.object_eraser || undefined}
             onImageChange={(url) => setTabImages((prev) => ({ ...prev, object_eraser: url }))}
@@ -1400,6 +1503,104 @@ function ToolsContent() {
           )}
         </div>
 
+
+            {/* ── Product Pack 4-Format Listing Suite Display ── */}
+            {productPackResult && activeTab === "product_detail" && (
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: "16px",
+                  background: "#080c14",
+                  border: "1px solid rgba(244, 114, 182, 0.3)",
+                  borderRadius: "14px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Box size={16} color="#f472b6" />
+                    <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#ffffff" }}>
+                      E-Commerce 4-Pack Marketplace Suite
+                    </span>
+                    <span style={{ fontSize: "11px", color: S.textMuted }}>
+                      ({productPackResult.product_name})
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "#f472b6",
+                      background: "rgba(244, 114, 182, 0.15)",
+                      padding: "2px 8px",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(244, 114, 182, 0.3)",
+                    }}
+                  >
+                    4 Formats Rendered
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
+                  {[
+                    { label: "Amazon White", ratio: "1:1", url: productPackResult.amazon_white_url, desc: "Catalog Standard" },
+                    { label: "Studio Pedestal", ratio: "4:5", url: productPackResult.studio_pedestal_url, desc: "Luxury Stage" },
+                    { label: "Lifestyle Table", ratio: "4:5", url: productPackResult.lifestyle_table_url, desc: "Warm Ambient" },
+                    { label: "Story Flyer", ratio: "9:16", url: productPackResult.story_flyer_url, desc: "Social Media" },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => { setToolOutput(item.url); setViewMode("result"); }}
+                      style={{
+                        background: toolOutput === item.url ? "rgba(244, 114, 182, 0.15)" : "#0d131f",
+                        border: toolOutput === item.url ? "2px solid #f472b6" : `1px solid ${S.borderLight}`,
+                        borderRadius: "10px",
+                        padding: "8px",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                        transition: "all 0.15s ease",
+                      }}
+                      title="Click to view in high-res on main stage"
+                    >
+                      <div style={{ width: "100%", aspectRatio: "1/1", borderRadius: "6px", overflow: "hidden", background: "#000" }}>
+                        <img src={item.url} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#ffffff" }}>{item.label}</span>
+                        <span style={{ fontSize: "9px", color: S.textMuted }}>{item.ratio}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                        <span style={{ fontSize: "9.5px", color: S.textSecondary }}>{item.desc}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerDownload(item.url);
+                          }}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "#f472b6",
+                            cursor: "pointer",
+                            padding: "2px",
+                          }}
+                          title="Download format"
+                        >
+                          <Download size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Bottom Actions: ⚡ Remix in Lab, Download, Replace & Remove */}
             <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "16px", flexWrap: "wrap" }}>
               {sourceImage && (
@@ -1713,6 +1914,57 @@ function ToolsContent() {
                   </div>
                 </div>
 
+                {/* Lighting & Shadow Harmonization Toggle */}
+                <div
+                  onClick={() => setHarmonizeLighting(!harmonizeLighting)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    background: harmonizeLighting ? "rgba(0, 212, 255, 0.08)" : S.card,
+                    border: harmonizeLighting ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Sun size={15} style={{ color: harmonizeLighting ? S.cyan : S.textSecondary }} />
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: harmonizeLighting ? "#ffffff" : S.textSecondary }}>
+                        Lighting &amp; Shadow Harmonization
+                      </div>
+                      <div style={{ fontSize: "10.5px", color: S.textMuted, marginTop: "1px" }}>
+                        Transfers ambient lighting, color bounce &amp; contact shadows
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "20px",
+                      borderRadius: "12px",
+                      background: harmonizeLighting ? S.cyan : "#2a2e3d",
+                      position: "relative",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        position: "absolute",
+                        top: "2px",
+                        left: harmonizeLighting ? "18px" : "2px",
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <button
                   onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
@@ -1783,6 +2035,65 @@ function ToolsContent() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Canvas Anchor Alignment */}
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                    Canvas Anchor Alignment
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginTop: "8px" }}>
+                    {[
+                      { id: "auto", label: "Auto" },
+                      { id: "center", label: "Center" },
+                      { id: "left", label: "Left" },
+                      { id: "right", label: "Right" },
+                    ].map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setExpandAlignment(a.id as any)}
+                        style={{
+                          padding: "8px 0",
+                          borderRadius: "8px",
+                          background: expandAlignment === a.id ? "rgba(99, 102, 241, 0.2)" : S.card,
+                          border: expandAlignment === a.id ? `1px solid ${S.primary}` : `1px solid ${S.borderLight}`,
+                          color: expandAlignment === a.id ? "#ffffff" : S.textSecondary,
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "center",
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Optional Scene Guidance / Outpaint Prompt */}
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                    Expansion Scene Guidance (Optional)
+                  </span>
+                  <input
+                    type="text"
+                    value={expandPrompt}
+                    onChange={(e) => setExpandPrompt(e.target.value)}
+                    placeholder="e.g. misty pine forest background, cinematic golden hour horizon"
+                    style={{
+                      width: "100%",
+                      background: "#080c14",
+                      border: `1px solid ${S.borderLight}`,
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: S.textPrimary,
+                      fontSize: "12.5px",
+                      marginTop: "6px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
                 </div>
 
                 <div
@@ -2059,6 +2370,86 @@ function ToolsContent() {
                   </div>
                 </div>
 
+                {/* Lighting Harmonization Toggle */}
+                <div
+                  onClick={() => setHarmonizeLighting(!harmonizeLighting)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    background: harmonizeLighting ? "rgba(244, 114, 182, 0.08)" : S.card,
+                    border: harmonizeLighting ? "1px solid #f472b6" : `1px solid ${S.borderLight}`,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Sun size={15} style={{ color: harmonizeLighting ? "#f472b6" : S.textSecondary }} />
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: harmonizeLighting ? "#ffffff" : S.textSecondary }}>
+                        Studio Light &amp; Shadow Harmonization
+                      </div>
+                      <div style={{ fontSize: "10.5px", color: S.textMuted, marginTop: "1px" }}>
+                        Preserves product details &amp; blends realistic drop shadows
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "20px",
+                      borderRadius: "12px",
+                      background: harmonizeLighting ? "#f472b6" : "#2a2e3d",
+                      position: "relative",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        position: "absolute",
+                        top: "2px",
+                        left: harmonizeLighting ? "18px" : "2px",
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* E-Commerce 4-Pack Suite Featured CTA */}
+                <button
+                  type="button"
+                  onClick={!sourceImage ? () => fileInputRef.current?.click() : handleGenerateProductPack}
+                  disabled={isProcessing || isGeneratingPack}
+                  style={{
+                    padding: "13px",
+                    borderRadius: "10px",
+                    background: isGeneratingPack ? "#1e1e2a" : "linear-gradient(135deg, rgba(244, 114, 182, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%)",
+                    border: "1.5px solid #f472b6",
+                    color: "#ffffff",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    cursor: isProcessing || isGeneratingPack ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    boxShadow: "0 0 16px rgba(244, 114, 182, 0.25)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <Sparkles size={16} color="#f472b6" />
+                  <span>
+                    {isGeneratingPack
+                      ? "Rendering 4 Marketplace Formats..."
+                      : "⚡ Generate 4-Pack Listing (Amazon, Pedestal, Table, Story)"}
+                  </span>
+                </button>
                 <button
                   onClick={!sourceImage ? () => fileInputRef.current?.click() : handleExecuteActiveTool}
                   disabled={isProcessing}
@@ -2149,6 +2540,81 @@ function ToolsContent() {
                       boxSizing: "border-box",
                     }}
                   />
+                </div>
+
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                    Supporting Subtext (Optional)
+                  </span>
+                  <input
+                    type="text"
+                    value={posterSubtext}
+                    onChange={(e) => setPosterSubtext(e.target.value)}
+                    placeholder="e.g. Single-origin cold brew • Available at all flagship stores"
+                    style={{
+                      width: "100%",
+                      background: "#080c14",
+                      border: `1px solid ${S.borderLight}`,
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: S.textPrimary,
+                      fontSize: "12.5px",
+                      marginTop: "6px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                      Discount / Promo Badge (Optional)
+                    </span>
+                    <input
+                      type="text"
+                      value={posterDiscount}
+                      onChange={(e) => setPosterDiscount(e.target.value)}
+                      placeholder="e.g. 50% OFF, BUY 1 GET 1"
+                      style={{
+                        width: "100%",
+                        background: "#080c14",
+                        border: `1px solid ${S.borderLight}`,
+                        borderRadius: "8px",
+                        padding: "10px",
+                        color: S.textPrimary,
+                        fontSize: "12px",
+                        marginTop: "6px",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                      Poster Theme
+                    </span>
+                    <select
+                      value={posterTheme}
+                      onChange={(e) => setPosterTheme(e.target.value)}
+                      style={{
+                        width: "100%",
+                        background: "#080c14",
+                        border: `1px solid ${S.borderLight}`,
+                        borderRadius: "8px",
+                        padding: "10px",
+                        color: S.textPrimary,
+                        fontSize: "12px",
+                        marginTop: "6px",
+                      }}
+                    >
+                      <option value="bold_sale">Bold Commercial Sale</option>
+                      <option value="minimal_luxury">Minimalist Luxury</option>
+                      <option value="cyber_neon">Cyberpunk Tech Neon</option>
+                      <option value="organic_natural">Organic Earthy Lifestyle</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>

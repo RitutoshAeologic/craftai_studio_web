@@ -82,6 +82,8 @@ export interface AiBackgroundPayload {
   aspectRatio?: "Auto" | "1:1" | "4:5" | "9:16" | "16:9" | string;
   aspect_ratio?: string;
   quality?: "1k" | "2k";
+  harmonizeLighting?: boolean;
+  harmonize_lighting?: boolean;
   userId?: string;
   user_id?: string;
 }
@@ -91,7 +93,14 @@ export interface AiExpandPayload {
   image_url?: string;
   targetRatio?: "16:9" | "9:16" | "1:1" | "4:5" | "3:4" | "4:3" | "2:3" | "3:2" | string;
   target_ratio?: string;
+  alignment?: "auto" | "center" | "left" | "right" | string;
+  prompt?: string;
+  scenePrompt?: string;
+  scene_prompt?: string;
+  engine?: "diffusion" | "reflection" | string;
   quality?: "1k" | "2k";
+  harmonizeLighting?: boolean;
+  harmonize_lighting?: boolean;
   userId?: string;
   user_id?: string;
 }
@@ -134,6 +143,8 @@ export interface ProductDetailPayload {
   aspect_ratio?: string;
   language?: string;
   quality?: "1k" | "2k";
+  harmonizeLighting?: boolean;
+  harmonize_lighting?: boolean;
   userId?: string;
   user_id?: string;
 }
@@ -144,6 +155,10 @@ export interface MarketingPosterPayload {
   topic?: string;
   category?: "Beverage" | "Fashion" | "Hiring" | "Flash Sale" | "Event" | "Commercial" | "Promotion" | string;
   headline?: string;
+  subtext?: string;
+  discountBadge?: string;
+  discount_badge?: string;
+  theme?: "bold_sale" | "minimal_luxury" | "cyber_neon" | "organic_natural" | string;
   aspectRatio?: "4:5" | "9:16" | "1:1" | "16:9" | string;
   aspect_ratio?: string;
   language?: string;
@@ -161,6 +176,58 @@ export interface ObjectEraserPayload {
   mask_url?: string;
   userId?: string;
   user_id?: string;
+}
+
+
+export interface ProductPackResponse {
+  task_id: string;
+  status: string;
+  product_name: string;
+  amazon_white_url: string;
+  studio_pedestal_url: string;
+  lifestyle_table_url: string;
+  story_flyer_url: string;
+  pack: {
+    amazon_white?: string;
+    studio_pedestal?: string;
+    lifestyle_table?: string;
+    story_flyer?: string;
+    amazon_white_url?: string;
+    studio_pedestal_url?: string;
+    lifestyle_table_url?: string;
+    story_flyer_url?: string;
+    [key: string]: string | undefined;
+  };
+  all_urls: string[];
+  tokens_consumed?: number;
+  credits_deducted?: number;
+  is_free?: boolean;
+}
+
+export interface MagicGrabPayload {
+  imageUrl?: string;
+  image_url?: string;
+  maskUrl?: string;
+  mask_url?: string;
+  imageBase64?: string;
+  image_base64?: string;
+  maskBase64?: string;
+  mask_base64?: string;
+  userId?: string;
+  user_id?: string;
+}
+
+export interface MagicGrabResponse {
+  task_id: string;
+  status: string;
+  cutout_url: string;
+  clean_background_url: string;
+  background_url: string;
+  all_urls: string[];
+  tokens_consumed?: number;
+  credits_deducted?: number;
+  latency_ms?: number;
+  is_free?: boolean;
 }
 
 export interface ColorizerPayload {
@@ -230,6 +297,18 @@ function normalizePayload(body: Record<string, any>): Record<string, any> {
       case "userId":
         normalized["user_id"] = value;
         break;
+      case "harmonizeLighting":
+        normalized["harmonize_lighting"] = value;
+        break;
+      case "discountBadge":
+        normalized["discount_badge"] = value;
+        break;
+      case "scenePrompt":
+        normalized["prompt"] = value;
+        break;
+      case "imageBase64":
+        normalized["image_base64"] = value;
+        break;
       default:
         normalized[key] = value;
     }
@@ -237,7 +316,7 @@ function normalizePayload(body: Record<string, any>): Record<string, any> {
   return normalized;
 }
 
-async function handleToolRequest<T extends BaseToolResponse>(
+async function handleToolRequest<T extends Record<string, any>>(
   endpoint: string,
   rawBody: Record<string, any>
 ): Promise<T> {
@@ -255,12 +334,13 @@ async function handleToolRequest<T extends BaseToolResponse>(
     });
 
     if (res.ok) {
-      const data = (await res.json()) as T;
-      // Guarantee triple URL parity fallback
-      if (!data.image_url) data.image_url = data.output_url || data.url || "";
-      if (!data.output_url) data.output_url = data.image_url || data.url || "";
-      if (!data.url) data.url = data.output_url || data.image_url || "";
-      return data;
+      const data = (await res.json()) as any;
+      if (data && typeof data === "object") {
+        if (!data.image_url) data.image_url = data.output_url || data.url || data.cutout_url || data.amazon_white_url || "";
+        if (!data.output_url) data.output_url = data.image_url || data.url || data.clean_background_url || data.studio_pedestal_url || "";
+        if (!data.url) data.url = data.output_url || data.image_url || "";
+      }
+      return data as T;
     }
 
     let errorDetail = `Tool request failed with status ${res.status}`;
@@ -446,6 +526,26 @@ export const toolsApi = {
       action: params.action,
       target_preset: params.targetPreset || params.target_preset,
       lock_subject: params.lockSubject ?? params.lock_subject ?? true,
+    });
+  },
+
+  // 11. E-Commerce 4-Pack Suite (Amazon, Studio Pedestal, Lifestyle, Story Flyer)
+  generateProductPack: async (
+    payload: ProductDetailPayload
+  ): Promise<ProductPackResponse> => {
+    return handleToolRequest<ProductPackResponse>("/product-pack", payload);
+  },
+
+  // 12. Magic Grab (Canva & Pixel Magic Editor Parity)
+  magicGrab: async (
+    payload: MagicGrabPayload
+  ): Promise<MagicGrabResponse> => {
+    return handleToolRequest<MagicGrabResponse>("/magic-grab", {
+      image_url: payload.imageUrl || payload.image_url,
+      mask_base64: payload.maskBase64 || payload.mask_base64,
+      mask_url: payload.maskUrl || payload.mask_url,
+      image_base64: payload.imageBase64 || payload.image_base64,
+      user_id: payload.userId || payload.user_id,
     });
   },
 
