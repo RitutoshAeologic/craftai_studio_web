@@ -175,7 +175,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const backendUrl =
           process.env.NEXT_PUBLIC_API_URL ||
           process.env.NEXT_PUBLIC_BACKEND_URL ||
-          "http://127.0.0.1:8001";
+          "http://200.141.14.171:8085";
         const endpoint = backendUrl.includes("/api/v1")
           ? `${backendUrl}/auth/signout`
           : `${backendUrl}/api/v1/auth/signout`;

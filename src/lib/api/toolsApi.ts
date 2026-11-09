@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 const rawBase =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000/api/v1";
+  "http://200.141.14.171:8085/api/v1";
 
 export const API_BASE = rawBase.replace(/\/+$/, "").endsWith("/api/v1")
   ? rawBase.replace(/\/+$/, "")
@@ -578,5 +578,51 @@ export const toolsApi = {
       console.warn("[toolsApi.getHistory] Error fetching history:", err);
     }
     return [];
+  },
+
+  // 13. Dynamic AI Background Templates Discovery (§2.14)
+  getAiBackgroundTemplates: async (): Promise<Array<{
+    id: string;
+    name: string;
+    title?: string;
+    description: string;
+    subtitle?: string;
+    credit_cost: number;
+    credits?: number;
+    prompt_suffix: string;
+    backdrop?: string;
+    icon?: string;
+  }>> => {
+    const headers = await getRequestHeaders();
+    try {
+      const res = await fetch(`${API_BASE}/tools/ai-background/templates`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.templates)) {
+          return data.templates.map((t: any) => ({
+            id: t.id,
+            name: t.name || t.title || t.id,
+            title: t.title || t.name || t.id,
+            description: t.description || t.subtitle || "",
+            subtitle: t.subtitle || t.description || "",
+            credit_cost: typeof t.credit_cost === "number" ? t.credit_cost : (typeof t.credits === "number" ? t.credits : 0),
+            credits: typeof t.credits === "number" ? t.credits : (typeof t.credit_cost === "number" ? t.credit_cost : 0),
+            prompt_suffix: t.prompt_suffix || t.backdrop || "",
+            backdrop: t.backdrop || t.prompt_suffix || "",
+            icon: t.icon,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("[toolsApi.getAiBackgroundTemplates] Fallback:", err);
+    }
+    return [
+      { id: "pure_white", name: "Pure White Studio", title: "Pure white", description: "High-key, shadowless e-commerce white background", subtitle: "Commercial Cyclo", credit_cost: 0, credits: 0, prompt_suffix: "clean seamless infinite pure white studio backdrop, soft high-key commercial lighting", backdrop: "", icon: "⚪" },
+      { id: "smart", name: "Smart Contextual AI", title: "Smart Studio", description: "AI automatically analyzes product subject and generates the optimal aesthetic scene", subtitle: "Product Keylight", credit_cost: 1, credits: 1, prompt_suffix: "photorealistic studio setting with organic shadows matching product geometry", backdrop: "commercial photorealistic studio keylight", icon: "🏢" },
+      { id: "marble", name: "Luxury Marble Podium", title: "Luxury Marble", description: "Italian Carrara marble pedestal with soft window illumination", subtitle: "Studio Pedestal", credit_cost: 1, credits: 1, prompt_suffix: "luxurious white Carrara marble pedestal, architectural minimalist interior, soft window dappled sunlight", backdrop: "luxury marble pedestal overhead soft spotlight", icon: "🏛️" },
+      { id: "wood", name: "Rustic Natural Wood", title: "Warm Wood", description: "Warm artisanal oak tabletop with morning bokeh", subtitle: "Cozy Cafe Table", credit_cost: 1, credits: 1, prompt_suffix: "warm rustic oak timber tabletop, warm morning daylight, soft blurred kitchen background", backdrop: "warm wooden tabletop cafe ambient lighting", icon: "🪵" },
+      { id: "neon", name: "Cyberpunk Neon", title: "Cyber Neon", description: "Futuristic moody reflections with vibrant edge lighting", subtitle: "Futuristic Glow", credit_cost: 1, credits: 1, prompt_suffix: "dark reflective acrylic floor, vibrant cyan and magenta neon edge rim lighting, futuristic studio", backdrop: "cyberpunk neon city illumination reflections", icon: "🌆" },
+      { id: "custom", name: "Custom User Prompt", title: "Custom Backdrop", description: "Describe your own custom studio backdrop and lighting", subtitle: "Write Any Prompt", credit_cost: 1, credits: 1, prompt_suffix: "", backdrop: "", icon: "✍️" },
+    ];
   },
 };

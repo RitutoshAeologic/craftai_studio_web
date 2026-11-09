@@ -27,7 +27,7 @@ import StyleBoostersDropdown, { STYLE_BOOSTERS } from "@/components/studio/Style
 import { ARTISTIC_PRESETS, type ArtisticPreset } from "@/components/studio/ArtisticStylePresetBar";
 import PromptCopilotModal from "@/components/studio/PromptCopilotModal";
 import { useGeneration } from "@/context/GenerationContext";
-import { saveGeneration, publishArtwork, savePrivateArtwork } from "@/lib/supabase/db";
+import { saveGeneration, publishArtwork, savePrivateArtwork, fetchWallet } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
 import { theme } from "@/lib/theme/themeGuard";
@@ -39,9 +39,11 @@ type Ratio = { id: AspectRatio; label: string };
 type AnchorMode = "character" | "style" | "scene";
 
 const MODELS: Model[] = [
-  { id: "flux",  label: "FLUX.1 Schnell", version: "v1.2" },
-  { id: "turbo", label: "SDXL Turbo",     version: "v2.0" },
-  { id: "sdxl",  label: "Stable Diffusion XL", version: "v1.0" },
+  { id: "flux",    label: "FLUX.1 Schnell", version: "v1.2" },
+  { id: "sdxl",    label: "SDXL-Lightning (RealVisXL v4.0)", version: "v4.0" },
+  { id: "turbo",   label: "SDXL Turbo",     version: "v2.0" },
+  { id: "gemini",  label: "Gemini Imagen 3", version: "v3.0" },
+  { id: "chatgpt", label: "ChatGPT DALL-E 3", version: "v3.0" },
 ];
 
 const RATIOS: Ratio[] = [
@@ -734,6 +736,20 @@ function StudioContent() {
     }
 
     try {
+      // Optimistic wallet deduction for instant UI feedback (2 Cr standard, 3 Cr Face-Lock)
+      const creditsCost = faceUrls.length > 0 ? 3 : 2;
+      try {
+        const stored = localStorage.getItem(`craftai_wallet_${userKey}`);
+        if (stored) {
+          const w = JSON.parse(stored);
+          if (w && typeof w.credits === "number") {
+            const updated = { ...w, credits: Math.max(0, w.credits - creditsCost) };
+            localStorage.setItem(`craftai_wallet_${userKey}`, JSON.stringify(updated));
+            window.dispatchEvent(new Event("craftai_wallet_updated"));
+          }
+        }
+      } catch {}
+
       // Step A: Dispatch task to FastAPI backend with locked seed
       const dispatchRes = await dispatchGeneration({
         prompt: promptToSend,
@@ -863,6 +879,13 @@ function StudioContent() {
       setImageLoading(false);
       setProgressPercent(0);
       setProgressMessage("");
+
+      // Re-synchronize live wallet balance from Supabase after server atomic deduction
+      fetchWallet(userKey)
+        .then(() => {
+          window.dispatchEvent(new Event("craftai_wallet_updated"));
+        })
+        .catch(() => {});
     }
   }
 

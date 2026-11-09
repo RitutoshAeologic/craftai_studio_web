@@ -4,7 +4,7 @@
  * Models: flux (FLUX.1 Schnell), turbo (SDXL Turbo), sdxl (Stable Diffusion XL)
  */
 
-export type ImageModel = "flux" | "turbo" | "sdxl";
+export type ImageModel = "flux" | "turbo" | "sdxl" | "gemini" | "chatgpt" | string;
 export type AspectRatio = "1:1" | "16:9" | "9:16" | "4:5";
 
 const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {

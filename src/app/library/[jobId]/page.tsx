@@ -25,6 +25,9 @@ import {
   unlockGenerationDownload,
   publishArtwork,
   fetchWallet,
+  fetchCategories,
+  type CategoryItem,
+  CANONICAL_CATEGORIES,
   type Generation,
   type Wallet,
 } from "@/lib/supabase/db";
@@ -50,14 +53,32 @@ export default function JobDetailPage() {
   const [copied, setCopied] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishCategory, setPublishCategory] = useState("Photorealism");
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(CANONICAL_CATEGORIES);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
+    fetchCategories().then((cats) => {
+      if (Array.isArray(cats) && cats.length > 0) {
+        setCategoriesList(cats);
+      }
+    });
+
     if (!jobId) return;
     Promise.all([
       fetchGenerationById(jobId, userKey),
       fetchWallet(userKey),
     ]).then(([foundJob, w]) => {
       setJob(foundJob);
+      if (foundJob) {
+        setPublishTitle(foundJob.prompt ? (foundJob.prompt.length > 40 ? `${foundJob.prompt.slice(0, 40)}...` : foundJob.prompt) : "Studio Creation");
+        // Auto-prefill category from job classification (§3.7)
+        if ((foundJob as any).category) {
+          setPublishCategory((foundJob as any).category);
+        }
+      }
       setWallet(w);
       setLoading(false);
     });
@@ -100,19 +121,38 @@ export default function JobDetailPage() {
     document.body.removeChild(a);
   };
 
-  const handlePublish = async () => {
+  const handleOpenPublishModal = () => {
     if (!job) return;
-    await publishArtwork({
-      prompt: job.prompt,
-      image_url: job.image_url,
-      model: job.model,
-      aspect_ratio: job.aspect_ratio,
-      author_name: profile.name,
-      author_handle: profile.handle,
-      author_avatar: profile.initials,
-    });
-    setPublishSuccess(true);
-    setTimeout(() => setPublishSuccess(false), 3000);
+    setPublishTitle(job.prompt ? (job.prompt.length > 40 ? `${job.prompt.slice(0, 40)}...` : job.prompt) : "Studio Creation");
+    if ((job as any).category) {
+      setPublishCategory((job as any).category);
+    }
+    setPublishModalOpen(true);
+  };
+
+  const handleConfirmPublish = async () => {
+    if (!job) return;
+    setIsPublishing(true);
+    try {
+      await publishArtwork({
+        title: publishTitle,
+        category: publishCategory,
+        prompt: job.prompt,
+        image_url: job.image_url,
+        model: job.model,
+        aspect_ratio: job.aspect_ratio,
+        user_id: user?.id,
+        author_id: user?.id,
+        author_name: profile.name,
+        author_handle: profile.handle,
+        author_avatar: profile.initials,
+      });
+      setPublishModalOpen(false);
+      setPublishSuccess(true);
+      setTimeout(() => setPublishSuccess(false), 3500);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleCopy = () => {
@@ -179,7 +219,7 @@ export default function JobDetailPage() {
 
         {/* Right Publish Button */}
         <button
-          onClick={handlePublish}
+          onClick={handleOpenPublishModal}
           style={{
             display: "flex",
             alignItems: "center",
@@ -767,6 +807,201 @@ export default function JobDetailPage() {
               >
                 <Download size={14} />
                 <span>{unlocking ? "Unlocking 4K..." : "Confirm & Unlock (2 Credits)"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ PUBLISH TO EXPLORE MODAL (§3.7 & §5.4.1) ══════════════ */}
+      {publishModalOpen && (
+        <div
+          onClick={() => setPublishModalOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: S.card,
+              border: `1px solid ${S.borderLight}`,
+              borderRadius: "18px",
+              width: "min(480px, 94vw)",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "18px",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Globe size={20} style={{ color: S.primary }} />
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: S.textPrimary }}>
+                  Publish to Explore Community
+                </h3>
+              </div>
+              <button
+                onClick={() => setPublishModalOpen(false)}
+                style={{ background: "transparent", border: "none", color: S.textSecondary, cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Artwork Preview Card */}
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                alignItems: "center",
+                background: "rgba(255, 255, 255, 0.03)",
+                border: `1px solid ${S.borderLight}`,
+                borderRadius: "12px",
+                padding: "10px",
+              }}
+            >
+              <img
+                src={job.image_url}
+                alt="Artwork preview"
+                style={{
+                  width: "60px",
+                  height: "60px",
+                  borderRadius: "8px",
+                  objectFit: "cover",
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "11px", color: S.textMuted }}>Model: {job.model || "FLUX.1 Schnell"}</div>
+                <div style={{ fontSize: "12px", color: S.textPrimary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {job.prompt}
+                </div>
+              </div>
+            </div>
+
+            {/* Title Input */}
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: S.textSecondary, marginBottom: "6px" }}>
+                Artwork Title
+              </label>
+              <input
+                type="text"
+                value={publishTitle}
+                onChange={(e) => setPublishTitle(e.target.value)}
+                placeholder="Give your creation an engaging title..."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: `1px solid ${S.borderLight}`,
+                  color: "#ffffff",
+                  fontSize: "13px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Category Selector (Auto-Prefilled from job.category) */}
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: S.textSecondary, marginBottom: "6px" }}>
+                Category (Auto-classified from visual content)
+              </label>
+              <select
+                value={publishCategory}
+                onChange={(e) => setPublishCategory(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  background: "#161b26",
+                  border: `1px solid ${S.borderLight}`,
+                  color: "#ffffff",
+                  fontSize: "13px",
+                  outline: "none",
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                {categoriesList
+                  .filter((c) => c.slug !== "all")
+                  .map((c) => (
+                    <option key={c.id} value={c.name} style={{ background: "#161b26", color: "#fff" }}>
+                      {c.name} — {c.description || "Style category"}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {/* Creator Royalty Split Badge */}
+            <div
+              style={{
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.25)",
+                borderRadius: "10px",
+                padding: "12px",
+                fontSize: "12px",
+                color: "#a7f3d0",
+                lineHeight: 1.5,
+              }}
+            >
+              <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#ffffff" }}>
+                💰 40% Creator Royalty Split Active
+              </p>
+              When other community creators remix your artwork formula in the Studio, you earn <strong>1.60 Credits ($0.16)</strong> royalty payout directly to your wallet.
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+              <button
+                onClick={() => setPublishModalOpen(false)}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "8px",
+                  background: "transparent",
+                  border: `1px solid ${S.borderLight}`,
+                  color: S.textSecondary,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleConfirmPublish}
+                disabled={isPublishing}
+                style={{
+                  flex: 2,
+                  padding: "10px",
+                  borderRadius: "8px",
+                  background: S.primary,
+                  border: "none",
+                  color: "#ffffff",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: isPublishing ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  boxShadow: "0 0 16px rgba(99, 102, 241, 0.4)",
+                }}
+              >
+                <Globe size={14} />
+                <span>{isPublishing ? "Publishing to Explore..." : "Confirm & Publish to Explore"}</span>
               </button>
             </div>
           </div>

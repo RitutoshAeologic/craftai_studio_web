@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { saveGeneration } from "@/lib/supabase/db";
 import { generateFreeImage, stripWatermark } from "@/lib/api/generate";
+import { initRemixSession, sendRemixChat, dispatchGeneration } from "@/lib/api/backend-client";
 import { useUser } from "@/context/UserContext";
 
 interface ChatMsg {
@@ -48,6 +49,8 @@ export default function RemixWorkspace({
   );
   const [styleWeight, setStyleWeight] = useState(0.55);
   const [generating, setGenerating] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [quickChips, setQuickChips] = useState<string[]>(QUICK_MODS);
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
       role: "ai",
@@ -56,6 +59,32 @@ export default function RemixWorkspace({
     },
   ]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (referenceImage) {
+      initRemixSession({
+        anchor_image_url: referenceImage,
+        source_type: "explore_card",
+        style_weight: styleWeight,
+      })
+        .then((sess) => {
+          if (sess.session_id) setSessionId(sess.session_id);
+          if (sess.welcome_message) {
+            setMessages([
+              {
+                role: "ai",
+                content: sess.welcome_message,
+                time: "Just now",
+              },
+            ]);
+          }
+          if (sess.suggested_chips && sess.suggested_chips.length > 0) {
+            setQuickChips(sess.suggested_chips);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [referenceImage]);
 
   // Resizable Right Panel Width (Draggable Remix Assistant)
   const [panelWidth, setPanelWidth] = useState<number>(420);
@@ -131,25 +160,67 @@ export default function RemixWorkspace({
     if (!promptMod.trim() || generating) return;
     setGenerating(true);
 
-    const userMsg: ChatMsg = { role: "user", content: promptMod, time: "Just now" };
-    setMessages((p) => [...p, userMsg]);
     const userInput = promptMod;
+    const userMsg: ChatMsg = { role: "user", content: userInput, time: "Just now" };
+    setMessages((p) => [...p, userMsg]);
+    setPromptMod("");
     if (isMobileOrTablet) {
       setActiveMobileTab("canvas");
     }
 
     try {
-      const generatedUrl = await generateFreeImage({
-        prompt: `${userInput}, cinematic 8k quality, masterpiece, vivid lighting`,
-        model: "flux",
-        aspectRatio: "1:1",
-      });
+      let refinedPrompt = userInput;
+      let aiExplanation = `Remix generated with FLUX.1 engine (Style Anchor: ${Math.round(styleWeight * 100)}%).`;
 
-      const cleanUrl = await stripWatermark(generatedUrl);
+      // Conversational remix chat turn with Groq / Gemini (§2.12)
+      if (sessionId) {
+        try {
+          const chatRes = await sendRemixChat({
+            session_id: sessionId,
+            user_instruction: userInput,
+            base_prompt: userInput,
+          });
+          if (chatRes.refined_prompt) {
+            refinedPrompt = chatRes.refined_prompt;
+          }
+          if (chatRes.explanation) {
+            aiExplanation = chatRes.explanation;
+          }
+          if (chatRes.suggested_chips && chatRes.suggested_chips.length > 0) {
+            setQuickChips(chatRes.suggested_chips);
+          }
+        } catch {}
+      }
+
+      // Generate remix artwork
+      let finalUrl = "";
+      try {
+        const dispatchRes = await dispatchGeneration({
+          prompt: `${refinedPrompt}, style weight ${styleWeight}`,
+          face_reference_urls: referenceImage.startsWith("http") ? [referenceImage] : null,
+          model: "flux",
+          width: 1024,
+          height: 1024,
+        });
+        if (dispatchRes.direct_image_url) {
+          finalUrl = dispatchRes.direct_image_url;
+        }
+      } catch {}
+
+      if (!finalUrl) {
+        finalUrl = await generateFreeImage({
+          prompt: `${refinedPrompt}, cinematic 8k quality, masterpiece, vivid lighting`,
+          model: "flux",
+          aspectRatio: "1:1",
+          referenceImage: referenceImage.startsWith("http") ? referenceImage : undefined,
+        });
+      }
+
+      const cleanUrl = await stripWatermark(finalUrl);
       setCurrentImgUrl(cleanUrl);
 
       await saveGeneration({
-        prompt: `Remix: ${userInput}`,
+        prompt: `Remix: ${refinedPrompt}`,
         image_url: cleanUrl,
         model: "Flux Schnell (Remix)",
         aspect_ratio: "1:1",
@@ -159,7 +230,7 @@ export default function RemixWorkspace({
 
       const aiReply: ChatMsg = {
         role: "ai",
-        content: `Remix generated with FLUX.1 engine (Style Anchor: ${Math.round(styleWeight * 100)}%). New variation saved to Supabase DB.`,
+        content: `${aiExplanation} New variation saved to your Cloud Library.`,
         time: "Just now",
       };
       setMessages((p) => [...p, aiReply]);
@@ -561,7 +632,7 @@ export default function RemixWorkspace({
               Quick Modifiers
             </p>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {QUICK_MODS.map((mod) => (
+              {quickChips.map((mod) => (
                 <button
                   key={mod}
                   type="button"

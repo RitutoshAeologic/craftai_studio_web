@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { fetchArtworkById, fetchArtworks, savePrivateArtwork, removePrivateArtwork, isArtworkBookmarked, type Artwork } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
-import { BACKEND_URL } from "@/lib/api/backend-client";
+import { BACKEND_URL, fetchSimilarCreations } from "@/lib/api/backend-client";
 
 const S = theme.colors;
 
@@ -50,34 +50,31 @@ export default function ExploreDetailPage() {
           setArtwork(found);
           setIsBookmarked(isArtworkBookmarked(found.id));
 
-          // Fetch similar artworks via backend with fallback to same category in DB
+          // Fetch similar artworks via backend with fallback to same category in DB (§2.15)
           try {
-            const res = await fetch(`${BACKEND_URL}/api/v1/search/explore/similar/${encodeURIComponent(artworkId)}?limit=8`);
-            if (res.ok) {
-              const similarData = await res.json();
-              if (Array.isArray(similarData) && similarData.length > 0) {
-                const formatted: Artwork[] = similarData.map((item: any) => ({
-                  id: item.id,
-                  title: item.title,
-                  prompt: item.title,
-                  masked_summary: `${item.category} • Masterpiece • [Secret Recipe Encrypted]`,
-                  image_url: item.preview_url || item.preview_image_url || "/placeholder.png",
-                  model: item.model_used || "FLUX.1 Schnell",
-                  category: item.category || found.category,
-                  likes_count: item.likes_count || 120,
-                  remix_count: item.remix_count || 18,
-                  author_name: item.author_name || "Creator",
-                  author_handle: item.author_handle?.replace(/^@/, "") || "creator",
-                  author_avatar: item.author_avatar || "CR",
-                  seed: item.seed || 42,
-                  width: 512,
-                  height: 512,
-                }));
-                if (isMounted) {
-                  setSimilarArtworks(formatted.filter((a) => a.id !== artworkId));
-                  setLoading(false);
-                  return;
-                }
+            const similarList = await fetchSimilarCreations(artworkId, 8);
+            if (Array.isArray(similarList) && similarList.length > 0) {
+              const formatted: Artwork[] = similarList.map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                prompt: item.title,
+                masked_summary: `${item.category || found.category} • Masterpiece • [Secret Recipe Encrypted]`,
+                image_url: item.image_url || item.preview_url || "/placeholder.png",
+                model: item.model_used || "FLUX.1 Schnell",
+                category: item.category || found.category,
+                likes_count: item.likes_count || 120,
+                remix_count: item.remix_count || 18,
+                author_name: item.author_name || "Creator",
+                author_handle: item.author_handle?.replace(/^@/, "") || "creator",
+                author_avatar: item.author_avatar || "CR",
+                seed: item.seed || 42,
+                width: 512,
+                height: 512,
+              }));
+              if (isMounted) {
+                setSimilarArtworks(formatted.filter((a) => a.id !== artworkId));
+                setLoading(false);
+                return;
               }
             }
           } catch {

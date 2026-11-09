@@ -3,7 +3,16 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, Heart, ChevronDown, Wand2, X, ShieldCheck, Sparkles, Image as ImageIcon, Camera, Lock, Bookmark, Cpu } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { fetchArtworks, savePrivateArtwork, removePrivateArtwork, isArtworkBookmarked, type Artwork } from "@/lib/supabase/db";
+import {
+  fetchArtworks,
+  savePrivateArtwork,
+  removePrivateArtwork,
+  isArtworkBookmarked,
+  fetchCategories,
+  type CategoryItem,
+  CANONICAL_CATEGORIES,
+  type Artwork,
+} from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
 
 /* ── Design tokens linked directly to Central Theme Guard ────── */
@@ -706,6 +715,7 @@ export default function ExplorePage() {
   const router = useRouter();
   const [items, setItems] = useState<Artwork[]>([]);
   const [category, setCategory] = useState("All");
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(CANONICAL_CATEGORIES);
   const [selectedModel, setSelectedModel] = useState("All Models");
   const [selectedRatio, setSelectedRatio] = useState("All Ratios");
   const [modelFilterOpen, setModelFilterOpen] = useState(false);
@@ -741,6 +751,12 @@ export default function ExplorePage() {
   };
 
   useEffect(() => {
+    fetchCategories().then((cats) => {
+      if (Array.isArray(cats) && cats.length > 0) {
+        setCategoriesList(cats);
+      }
+    });
+
     fetchArtworks().then((data) => {
       setItems(data);
       syncBookmarks(data);
@@ -876,28 +892,33 @@ export default function ExplorePage() {
             paddingBottom: "2px",
           }}
         >
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              id={`filter-${cat.toLowerCase().replace(" ", "-")}`}
-              onClick={() => setCategory(cat)}
-              style={{
-                padding: "7px 16px",
-                borderRadius: "9999px",
-                border: category === cat ? "none" : `1px solid ${S.borderLight}`,
-                background: category === cat ? S.primary : S.card,
-                color: category === cat ? "#ffffff" : S.textSecondary,
-                fontSize: "12px",
-                fontWeight: category === cat ? 700 : 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                transition: "all 0.15s",
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+          {categoriesList.map((cat) => {
+            const isSelected =
+              category.toLowerCase() === cat.name.toLowerCase() ||
+              (cat.slug === "all" && category.toLowerCase() === "all");
+            return (
+              <button
+                key={cat.id}
+                id={`filter-${cat.slug}`}
+                onClick={() => setCategory(cat.name)}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: "9999px",
+                  border: isSelected ? "none" : `1px solid ${S.borderLight}`,
+                  background: isSelected ? S.primary : S.card,
+                  color: isSelected ? "#ffffff" : S.textSecondary,
+                  fontSize: "12px",
+                  fontWeight: isSelected ? 700 : 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  transition: "all 0.15s",
+                }}
+              >
+                {cat.name}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tier 2: Search on Left + Filter Dropdowns on Right (Aligned on single clean row) */}

@@ -10,7 +10,7 @@ import { safeUUID } from "@/lib/utils/uuid";
 const rawBackendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000";
+  "http://200.141.14.171:8085";
 
 // Normalize so it never ends with /api/v1 or trailing slashes, since endpoints append /api/v1/...
 export const BACKEND_URL = rawBackendUrl
@@ -734,4 +734,338 @@ export async function scanAestheticVision(imageUrl: string): Promise<VisionScanR
     lighting_optics: "Golden hour rim light, 85mm f/1.4 lens depth",
     model_used: "Aesthetic Vision Fallback Engine",
   };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   8. Dynamic Master Categories & Taxonomy API (§2.13 & §3.7)
+   GET /api/v1/categories
+───────────────────────────────────────────────────────────── */
+export interface CategoryItem {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  icon_name: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export const CANONICAL_CATEGORIES: CategoryItem[] = [
+  { id: "cat_all", slug: "all", name: "All", description: "All community creations across styles", icon_name: "sparkles", sort_order: 0, is_active: true },
+  { id: "cat_photorealism", slug: "photorealism", name: "Photorealism", description: "DSLR optics, portraiture, 8K realistic photography", icon_name: "camera", sort_order: 1, is_active: true },
+  { id: "cat_anime", slug: "anime", name: "Anime", description: "Japanese animation, Makoto Shinkai, cel-shaded art", icon_name: "palette", sort_order: 2, is_active: true },
+  { id: "cat_cyberpunk", slug: "cyberpunk", name: "Cyberpunk", description: "Futuristic neon cityscapes, sci-fi tech, high-contrast glow", icon_name: "bolt", sort_order: 3, is_active: true },
+  { id: "cat_3d_render", slug: "3d-render", name: "3D Render", description: "Octane Render, Unreal Engine 5, claymation, isometric", icon_name: "cube", sort_order: 4, is_active: true },
+  { id: "cat_character", slug: "character", name: "Character", description: "Human portraits, stylized avatars, oil painting portraits", icon_name: "person", sort_order: 5, is_active: true },
+  { id: "cat_architecture", slug: "architecture", name: "Architecture", description: "Modern interiors, brutalist structures, biophilic design", icon_name: "home", sort_order: 6, is_active: true },
+  { id: "cat_product", slug: "product", name: "Product", description: "Studio advertising, luxury mockups, clean commercial visuals", icon_name: "shopping_bag", sort_order: 7, is_active: true },
+];
+
+let _cachedCategories: CategoryItem[] | null = null;
+const CATEGORIES_CACHE_KEY = "craftai_dynamic_categories_v1";
+
+export async function fetchCategories(): Promise<CategoryItem[]> {
+  // 1. Check in-memory cache
+  if (_cachedCategories && _cachedCategories.length > 0) {
+    return _cachedCategories;
+  }
+
+  // 2. Check localStorage cache for 0ms instant render
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(CATEGORIES_CACHE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          _cachedCategories = parsed;
+          refreshCategoriesInBackground();
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Try Backend API
+  try {
+    const authHeader = await getAuthHeader();
+    const res = await fetch(`${BACKEND_URL}/api/v1/categories`, {
+      headers: { ...authHeader },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const list = data.categories || data;
+      if (Array.isArray(list) && list.length > 0) {
+        _cachedCategories = list;
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(list));
+        }
+        return list;
+      }
+    }
+  } catch (err) {
+    console.warn("[fetchCategories] Backend API fallback:", err);
+  }
+
+  // 4. Try Supabase categories table
+  try {
+    const supabase = createClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        _cachedCategories = data;
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data));
+        }
+        return data;
+      }
+    }
+  } catch {}
+
+  // 5. Fallback to canonical list
+  _cachedCategories = CANONICAL_CATEGORIES;
+  return CANONICAL_CATEGORIES;
+}
+
+async function refreshCategoriesInBackground(): Promise<void> {
+  try {
+    const authHeader = await getAuthHeader();
+    const res = await fetch(`${BACKEND_URL}/api/v1/categories`, {
+      headers: { ...authHeader },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const list = data.categories || data;
+      if (Array.isArray(list) && list.length > 0) {
+        _cachedCategories = list;
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(list));
+        }
+      }
+    }
+  } catch {}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   9. Conversational Remix Lab API (§2.12)
+   POST /api/v1/prompt-engineering/remix/sessions
+   POST /api/v1/prompt-engineering/remix/chat
+───────────────────────────────────────────────────────────── */
+export interface RemixSessionInitParams {
+  anchor_image_url: string;
+  source_type?: string;
+  style_weight?: number;
+}
+
+export interface RemixSessionResponse {
+  session_id: string;
+  anchor_image_url: string;
+  welcome_message?: string;
+  suggested_chips?: string[];
+}
+
+export interface RemixChatParams {
+  session_id: string;
+  user_instruction: string;
+  ai_model?: string;
+  base_prompt?: string;
+}
+
+export interface RemixChatResponse {
+  turn_count: number;
+  refined_prompt: string;
+  explanation?: string;
+  diff_added?: string;
+  diff_removed?: string;
+  suggested_chips?: string[];
+  latency_ms?: number;
+}
+
+export async function initRemixSession(
+  params: RemixSessionInitParams
+): Promise<RemixSessionResponse> {
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/prompt-engineering/remix/sessions`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+        body: JSON.stringify({
+          anchor_image_url: params.anchor_image_url,
+          source_type: params.source_type || "explore_card",
+          style_weight: params.style_weight ?? 0.75,
+        }),
+      }
+    );
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn("[initRemixSession] Fallback:", err);
+  }
+
+  // Client fallback
+  return {
+    session_id: `remix_sess_${Math.random().toString(36).substring(2, 10)}`,
+    anchor_image_url: params.anchor_image_url,
+    welcome_message: "Anchor image locked! How would you like to remix or transform this artwork?",
+    suggested_chips: [
+      "Switch lighting to moody cinematic golden hour",
+      "Convert art style to Japanese Ukiyo-e woodblock print",
+      "Transform into a miniature 3D isometric diorama",
+      "Add dramatic volumetric rain reflections",
+    ],
+  };
+}
+
+export async function sendRemixChat(
+  params: RemixChatParams
+): Promise<RemixChatResponse> {
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/prompt-engineering/remix/chat`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+        body: JSON.stringify({
+          session_id: params.session_id,
+          user_instruction: params.user_instruction,
+          ai_model: params.ai_model || "groq",
+          base_prompt: params.base_prompt || "",
+        }),
+      }
+    );
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn("[sendRemixChat] Fallback:", err);
+  }
+
+  // Client fallback
+  return {
+    turn_count: 1,
+    refined_prompt: `${params.base_prompt || "Artwork"}, ${params.user_instruction}, cinematic lighting, 8k quality`,
+    explanation: `Applied transformation: "${params.user_instruction}"`,
+    diff_added: params.user_instruction,
+    diff_removed: "",
+    suggested_chips: [
+      "Add intense lighting reflections",
+      "Make textures ultra photorealistic 8K",
+      "Switch perspective to dynamic low angle",
+    ],
+    latency_ms: 600,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   10. Cloud Library Asset Deletion (§2.13)
+   DELETE /api/v1/prompt-engineering/library/{job_id}
+───────────────────────────────────────────────────────────── */
+export async function deleteLibraryAsset(jobId: string): Promise<boolean> {
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/prompt-engineering/library/${encodeURIComponent(jobId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          ...authHeader,
+        },
+      }
+    );
+    return res.ok;
+  } catch (err) {
+    console.warn("[deleteLibraryAsset] Backend notice:", err);
+    return false;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   11. Universal Search & Similar Artwork Discovery (§2.15)
+   GET /api/v1/explore/similar/{card_id}
+   POST /api/v1/prompt-engineering/search
+───────────────────────────────────────────────────────────── */
+export interface SimilarCreationsResponse {
+  source_card_id: string;
+  similar: Array<{
+    id: string;
+    title: string;
+    image_url: string;
+    category: string;
+    similarity_score?: number;
+    preview_url?: string;
+    model_used?: string;
+  }>;
+}
+
+export async function fetchSimilarCreations(
+  cardId: string,
+  limit: number = 8
+): Promise<SimilarCreationsResponse["similar"]> {
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/explore/similar/${encodeURIComponent(cardId)}?limit=${limit}`,
+      {
+        headers: {
+          ...authHeader,
+        },
+      }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.similar)) {
+        return data.similar;
+      }
+      if (Array.isArray(data)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn("[fetchSimilarCreations] Fallback:", err);
+  }
+  return [];
+}
+
+export interface UniversalSearchParams {
+  query: string;
+  search_type?: "text" | "semantic";
+  aspect_ratios?: string[];
+  sort_by?: "popular" | "recent" | "trending";
+  page_size?: number;
+}
+
+export async function searchExploreApi(
+  params: UniversalSearchParams
+): Promise<any[]> {
+  const authHeader = await getAuthHeader();
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/prompt-engineering/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader,
+      },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : data.results || [];
+    }
+  } catch (err) {
+    console.warn("[searchExploreApi] Fallback:", err);
+  }
+  return [];
 }

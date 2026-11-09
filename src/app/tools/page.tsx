@@ -296,6 +296,15 @@ function ToolsContent() {
   const [customBackdrop, setCustomBackdrop] = useState<string>("Modern concrete podium with soft morning sunlight");
   const [bgRatio, setBgRatio] = useState<string>("1:1");
   const [bgQuality, setBgQuality] = useState<"1k" | "2k">("1k");
+  const [bgTemplates, setBgTemplates] = useState<Array<{ id: string; name: string; description: string; credit_cost: number; prompt_suffix: string }>>([]);
+
+  useEffect(() => {
+    toolsApi.getAiBackgroundTemplates().then((tpls) => {
+      if (Array.isArray(tpls) && tpls.length > 0) {
+        setBgTemplates(tpls);
+      }
+    });
+  }, []);
 
   // AI Expand State
   const [expandRatio, setExpandRatio] = useState<string>("16:9");
@@ -1829,6 +1838,43 @@ function ToolsContent() {
                     ))}
                   </div>
                 </div>
+
+                {/* Dynamic Studio Templates Discovery (§2.14) */}
+                {bgTemplates.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: S.textSecondary, textTransform: "uppercase" }}>
+                      Featured Studio Backdrops
+                    </span>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
+                      {bgTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => {
+                            if (tpl.id === "pure_white" || tpl.id === "smart") {
+                              setBgMode(tpl.id as any);
+                            } else {
+                              setBgMode("custom");
+                              if (tpl.prompt_suffix) setCustomBackdrop(tpl.prompt_suffix);
+                            }
+                          }}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: "6px",
+                            background: "rgba(255, 255, 255, 0.04)",
+                            border: `1px solid ${S.borderLight}`,
+                            color: S.textSecondary,
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {tpl.name} ({tpl.credit_cost} Cr)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Custom Backdrop Textarea */}
                 {bgMode === "custom" && (

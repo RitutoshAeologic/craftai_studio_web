@@ -13,7 +13,16 @@ import {
   Filter,
   Bookmark,
 } from "lucide-react";
-import { fetchArtworks, savePrivateArtwork, removePrivateArtwork, isArtworkBookmarked, type Artwork } from "@/lib/supabase/db";
+import {
+  fetchArtworks,
+  savePrivateArtwork,
+  removePrivateArtwork,
+  isArtworkBookmarked,
+  fetchCategories,
+  type CategoryItem,
+  CANONICAL_CATEGORIES,
+  type Artwork,
+} from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
 
 const S = theme.colors;
@@ -37,6 +46,7 @@ export default function CategoryExplorePage() {
   const activeCategory = decodeURIComponent(rawCategory).toLowerCase();
 
   const [items, setItems] = useState<Artwork[]>([]);
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(CANONICAL_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("Trending Now");
   const [sortOpen, setSortOpen] = useState(false);
@@ -54,7 +64,14 @@ export default function CategoryExplorePage() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchArtworks().then((data) => {
+
+    fetchCategories().then((cats) => {
+      if (isMounted && Array.isArray(cats) && cats.length > 0) {
+        setCategoriesList(cats);
+      }
+    });
+
+    fetchArtworks(activeCategory).then((data) => {
       if (isMounted) {
         setItems(data);
         syncBookmarks(data);
@@ -120,7 +137,7 @@ export default function CategoryExplorePage() {
   }, [items, activeCategory, searchQuery, sortBy]);
 
   const displayCategoryTitle =
-    ALL_CATEGORIES.find((c) => c.toLowerCase() === activeCategory) ||
+    categoriesList.find((c) => c.slug.toLowerCase() === activeCategory || c.name.toLowerCase() === activeCategory)?.name ||
     activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1);
 
   return (
@@ -249,29 +266,33 @@ export default function CategoryExplorePage() {
           >
             All
           </button>
-          {ALL_CATEGORIES.map((cat) => {
-            const isCurrent = cat.toLowerCase() === activeCategory;
-            return (
-              <button
-                key={cat}
-                onClick={() => router.push(`/explore/category/${encodeURIComponent(cat.toLowerCase())}`)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: "9999px",
-                  border: isCurrent ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
-                  background: isCurrent ? "rgba(0, 212, 255, 0.15)" : "rgba(255, 255, 255, 0.03)",
-                  color: isCurrent ? S.cyan : S.textSecondary,
-                  fontSize: "12.5px",
-                  fontWeight: isCurrent ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s",
-                }}
-              >
-                {cat}
-              </button>
-            );
-          })}
+          {categoriesList
+            .filter((c) => c.slug !== "all")
+            .map((cat) => {
+              const isCurrent =
+                cat.slug.toLowerCase() === activeCategory ||
+                cat.name.toLowerCase() === activeCategory;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => router.push(`/explore/category/${encodeURIComponent(cat.slug)}`)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    border: isCurrent ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
+                    background: isCurrent ? "rgba(0, 212, 255, 0.15)" : "rgba(255, 255, 255, 0.03)",
+                    color: isCurrent ? S.cyan : S.textSecondary,
+                    fontSize: "12.5px",
+                    fontWeight: isCurrent ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
         </div>
 
         {/* Sort Dropdown */}

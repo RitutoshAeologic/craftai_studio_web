@@ -1,4 +1,12 @@
 import { createClient } from "./client";
+import {
+  deleteLibraryAsset,
+  fetchCategories,
+  type CategoryItem,
+  CANONICAL_CATEGORIES,
+} from "@/lib/api/backend-client";
+
+export { fetchCategories, type CategoryItem, CANONICAL_CATEGORIES };
 
 export interface Artwork {
   id: string;
@@ -271,16 +279,17 @@ export const SEED_GENERATIONS: Generation[] = [
 const ARTWORKS_KEY = "craftai_db_artworks_v1";
 const GENERATIONS_KEY = "craftai_db_generations_v1";
 
-/* ── Fetch Artworks with 0-Latency Optimistic Cache ──────────── */
-export async function fetchArtworks(): Promise<Artwork[]> {
-  // 1. Check local cache first for 0ms instant render
-  if (typeof window !== "undefined") {
+/* ── Fetch Artworks with 0-Latency Optimistic Cache & Case-Insensitive PostgREST Filter ── */
+export async function fetchArtworks(categoryFilter?: string): Promise<Artwork[]> {
+  const isFiltered = Boolean(categoryFilter && categoryFilter.toLowerCase() !== "all");
+
+  // 1. Check local cache first for 0ms instant render (when unfiltered)
+  if (!isFiltered && typeof window !== "undefined") {
     try {
       const cached = localStorage.getItem(ARTWORKS_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Trigger async background sync with Supabase
           syncArtworksFromSupabase();
           return parsed;
         }
@@ -290,20 +299,48 @@ export async function fetchArtworks(): Promise<Artwork[]> {
     }
   }
 
-  // 2. Try fetching from Supabase DB (silently fallback if table not yet migrated)
+  // 2. Try fetching from Supabase DB with case-insensitive category matching (.ilike)
   const supabase = createClient();
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from("artworks")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let query = supabase.from("artworks").select("*");
+      if (isFiltered && categoryFilter) {
+        query = query.ilike("category", categoryFilter);
+      }
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (!error && data && data.length > 0) {
-        if (typeof window !== "undefined") {
+        if (!isFiltered && typeof window !== "undefined") {
           localStorage.setItem(ARTWORKS_KEY, JSON.stringify(data));
         }
         return data as Artwork[];
+      }
+
+      // Fallback query to explore_prompts if artworks returned empty
+      let epQuery = supabase.from("explore_prompts").select("*");
+      if (isFiltered && categoryFilter) {
+        epQuery = epQuery.ilike("category", categoryFilter);
+      }
+      const { data: epData, error: epError } = await epQuery.order("created_at", { ascending: false });
+      if (!epError && epData && epData.length > 0) {
+        const mapped: Artwork[] = epData.map((ep: any) => ({
+          id: ep.id,
+          title: ep.title || "Community Artwork",
+          prompt: ep.prompt || ep.title || "",
+          image_url: ep.image_url || ep.preview_url || "",
+          fallback_url: ep.image_url || ep.preview_url || "",
+          model: ep.model_used || ep.model || "FLUX.1 Schnell",
+          category: ep.category || "Photorealism",
+          likes_count: ep.likes_count || 1,
+          author_name: ep.author_name || "Creator",
+          author_handle: ep.author_handle || "@creator",
+          author_avatar: ep.author_avatar || "CR",
+          seed: ep.seed || 42,
+          width: 512,
+          height: 512,
+          created_at: ep.created_at || new Date().toISOString(),
+        }));
+        return mapped;
       }
     } catch {
       // Table unmigrated or network fallback - seamlessly use cache/seed
@@ -311,10 +348,18 @@ export async function fetchArtworks(): Promise<Artwork[]> {
   }
 
   // 3. Fallback to seed data and store in cache
-  if (typeof window !== "undefined") {
+  let fallbackList = SEED_ARTWORKS;
+  if (isFiltered && categoryFilter) {
+    fallbackList = SEED_ARTWORKS.filter(
+      (a) => a.category.toLowerCase() === categoryFilter.toLowerCase()
+    );
+    if (fallbackList.length === 0) fallbackList = SEED_ARTWORKS;
+  }
+
+  if (!isFiltered && typeof window !== "undefined") {
     localStorage.setItem(ARTWORKS_KEY, JSON.stringify(SEED_ARTWORKS));
   }
-  return SEED_ARTWORKS;
+  return fallbackList;
 }
 
 async function syncArtworksFromSupabase() {
@@ -595,6 +640,11 @@ export async function deleteGeneration(id: string, userIdentifier?: string): Pro
   try {
     await fetch(`/api/jobs?id=${encodeURIComponent(id)}`, { method: "DELETE" });
   } catch {}
+
+  // Trigger atomic backend storage & database asset purge
+  try {
+    deleteLibraryAsset(id).catch(() => {});
+  } catch {}
 }
 
 /* ── Fetch Single Artwork by ID ──────────────────────────────── */
@@ -606,18 +656,25 @@ export async function fetchArtworkById(id: string): Promise<Artwork | null> {
 /* ── Bookmarks / Private Saved Cache Key ─────────────────────── */
 export const BOOKMARKS_KEY = "craftai_db_bookmarks_v1";
 
-/* ── Publish Artwork to Explore Gallery & DB ─────────────────── */
+/* ── Publish Artwork to Explore Gallery & DB (§3.3 & §3.7) ───── */
 export async function publishArtwork(params: {
   prompt: string;
   image_url: string;
+  title?: string;
+  category?: string;
   model?: string;
   aspect_ratio?: string;
+  user_id?: string;
+  author_id?: string;
   author_name?: string;
   author_handle?: string;
   author_avatar?: string;
 }): Promise<Artwork> {
   const cleanPrompt = (params.prompt || "").trim();
-  const cleanTitle = cleanPrompt.length > 36 ? `${cleanPrompt.slice(0, 36)}...` : cleanPrompt || "Studio Artwork";
+  const cleanTitle =
+    params.title?.trim() ||
+    (cleanPrompt.length > 36 ? `${cleanPrompt.slice(0, 36)}...` : cleanPrompt || "Studio Artwork");
+  const chosenCategory = params.category?.trim() || "Photorealism";
 
   const newArt: Artwork = {
     id: `art-${Date.now()}`,
@@ -626,7 +683,7 @@ export async function publishArtwork(params: {
     image_url: params.image_url,
     fallback_url: params.image_url,
     model: params.model || "FLUX.1 Schnell",
-    category: "Community Creation",
+    category: chosenCategory,
     likes_count: 1,
     author_name: params.author_name || "Alex Rivera",
     author_handle: params.author_handle || "@alexrivera_ai",
@@ -649,16 +706,47 @@ export async function publishArtwork(params: {
     }
   }
 
-  // 2. Persist to Supabase DB (safely attempt without breaking UI or throwing errors)
+  // 2. Persist to Supabase DB (artworks and explore_prompts for two-way trigger parity)
   const supabase = createClient();
   if (supabase) {
+    const creatorId = params.user_id || params.author_id;
     try {
-      const { error } = await supabase.from("artworks").insert([newArt]);
-      if (error && error.code !== "PGRST205") {
-        console.debug("[Supabase] Publish sync notice:", error.message);
-      }
-    } catch {
-      // Offline / unmigrated fallback handled cleanly in local storage
+      await supabase.from("artworks").insert([
+        {
+          ...newArt,
+          user_id: creatorId,
+          author_id: creatorId,
+          is_marketplace_public: true,
+          base_remix_fee: 4.0,
+          author_royalty_cut: 1.6,
+        },
+      ]);
+    } catch (err) {
+      console.debug("[Supabase] artworks publish sync notice:", err);
+    }
+
+    try {
+      await supabase.from("explore_prompts").insert([
+        {
+          title: cleanTitle,
+          prompt: cleanPrompt,
+          masked_summary: `${chosenCategory} • Masterpiece • [Secret Recipe Encrypted]`,
+          preview_url: params.image_url,
+          image_url: params.image_url,
+          model_used: params.model || "FLUX.1 Schnell",
+          category: chosenCategory,
+          author_name: params.author_name || "Alex Rivera",
+          author_handle: params.author_handle || "@alexrivera_ai",
+          author_avatar: params.author_avatar || "AR",
+          user_id: creatorId,
+          author_id: creatorId,
+          is_marketplace_public: true,
+          base_remix_fee: 4.0,
+          author_royalty_cut: 1.6,
+        },
+      ]);
+    } catch (err) {
+      console.debug("[Supabase] explore_prompts publish sync notice:", err);
     }
   }
 

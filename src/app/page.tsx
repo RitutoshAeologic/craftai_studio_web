@@ -46,8 +46,10 @@ const QUICK_PROMPTS = [
 
 const ENGINES = [
   { id: "flux", label: "Flux Schnell" },
+  { id: "sdxl", label: "SDXL-Lightning" },
   { id: "turbo", label: "SDXL Turbo" },
-  { id: "sdxl", label: "Stable XL" },
+  { id: "gemini", label: "Gemini Imagen 3" },
+  { id: "chatgpt", label: "ChatGPT DALL-E 3" },
 ];
 
 export default function HomePage() {
