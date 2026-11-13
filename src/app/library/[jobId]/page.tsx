@@ -19,9 +19,12 @@ import {
   X,
   Globe,
   Maximize2,
+  Trash2,
+  ZoomIn,
 } from "lucide-react";
 import {
   fetchGenerationById,
+  deleteGeneration,
   unlockGenerationDownload,
   publishArtwork,
   fetchWallet,
@@ -33,6 +36,8 @@ import {
 } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { theme } from "@/lib/theme/themeGuard";
+import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
+import { DeleteConfirmationModal } from "@/components/ui/DeleteConfirmationModal";
 
 const S = theme.colors;
 
@@ -58,6 +63,9 @@ export default function JobDetailPage() {
   const [publishCategory, setPublishCategory] = useState("Photorealism");
   const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(CANONICAL_CATEGORIES);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchCategories().then((cats) => {
@@ -108,6 +116,17 @@ export default function JobDetailPage() {
       }
     } finally {
       setUnlocking(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!job) return;
+    setIsDeleting(true);
+    try {
+      await deleteGeneration(job.id, userKey);
+      router.push("/library");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -191,7 +210,8 @@ export default function JobDetailPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: S.bg,
+          background: "rgba(11, 11, 15, 0.9)",
+          backdropFilter: "blur(14px)",
           position: "sticky",
           top: 0,
           zIndex: 40,
@@ -217,27 +237,54 @@ export default function JobDetailPage() {
           <span>Library</span>
         </button>
 
-        {/* Right Publish Button */}
-        <button
-          onClick={handleOpenPublishModal}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "7px 16px",
-            borderRadius: "9999px",
-            background: publishSuccess ? "rgba(16, 185, 129, 0.2)" : S.primary,
-            border: publishSuccess ? "1px solid rgba(16, 185, 129, 0.4)" : "none",
-            color: publishSuccess ? S.success : "#ffffff",
-            fontSize: "12px",
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 0 16px rgba(99, 102, 241, 0.3)",
-          }}
-        >
-          {publishSuccess ? <Check size={14} /> : <Globe size={14} />}
-          <span>{publishSuccess ? "Published to Explore!" : "+ Publish (Earn Royalties)"}</span>
-        </button>
+        {/* Right Actions: Publish & Delete */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button
+            onClick={handleOpenPublishModal}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 16px",
+              borderRadius: "9999px",
+              background: publishSuccess ? "rgba(16, 185, 129, 0.2)" : S.primary,
+              border: publishSuccess ? "1px solid rgba(16, 185, 129, 0.4)" : "none",
+              color: publishSuccess ? S.success : "#ffffff",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 0 16px rgba(99, 102, 241, 0.3)",
+            }}
+          >
+            {publishSuccess ? <Check size={14} /> : <Globe size={14} />}
+            <span>{publishSuccess ? "Published to Explore!" : "+ Publish (Earn Royalties)"}</span>
+          </button>
+
+          <button
+            onClick={() => setDeleteModalOpen(true)}
+            title="Delete creation"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "7px 12px",
+              borderRadius: "9999px",
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              color: "#ef4444",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              gap: "6px",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(239, 68, 68, 0.2)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(239, 68, 68, 0.1)")}
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Main Detail Viewport ─────────────────────────────── */}
@@ -256,6 +303,7 @@ export default function JobDetailPage() {
       >
         {/* Hero Image Container */}
         <div
+          onClick={() => setLightboxOpen(true)}
           style={{
             position: "relative",
             width: "100%",
@@ -265,6 +313,7 @@ export default function JobDetailPage() {
             border: `1px solid ${S.cardBorder}`,
             boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
             marginBottom: "16px",
+            cursor: "zoom-in",
           }}
         >
           <img
@@ -296,6 +345,30 @@ export default function JobDetailPage() {
             }}
           >
             {job.is_download_unlocked ? "Unlocked 4K Master" : "Cloud Saved (Free)"}
+          </div>
+
+          {/* Pinch & Zoom Affordance Badge */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "14px",
+              right: "14px",
+              padding: "6px 12px",
+              borderRadius: "9999px",
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              color: "#ffffff",
+              fontSize: "11px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              pointerEvents: "none",
+            }}
+          >
+            <ZoomIn size={12} style={{ color: S.cyan }} />
+            <span>Pinch &amp; Zoom</span>
           </div>
         </div>
 
@@ -1007,6 +1080,27 @@ export default function JobDetailPage() {
           </div>
         </div>
       )}
+      {/* ── IMAGE LIGHTBOX MODAL ─────────────────────────────── */}
+      <ImageLightboxModal
+        isOpen={lightboxOpen}
+        imageUrl={job.image_url}
+        title={job.prompt || "Creation Master"}
+        subtitle={(job as any).category || job.model || "Studio Creation"}
+        aspectRatio={job.aspect_ratio}
+        isUnlocked={job.is_download_unlocked}
+        onClose={() => setLightboxOpen(false)}
+        onDownload={handleDownloadClick}
+      />
+
+      {/* ── DELETE CONFIRMATION MODAL ───────────────────────── */}
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        title="Delete Creation"
+        description="Are you sure you want to permanently delete this creation? This action cannot be undone."
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteModalOpen(false)}
+      />
     </div>
   );
 }

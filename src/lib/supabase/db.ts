@@ -45,6 +45,7 @@ export interface Generation {
   is_download_unlocked?: boolean;
   credits_deducted?: number;
   type?: string;
+  category?: string;
 }
 
 export interface Wallet {

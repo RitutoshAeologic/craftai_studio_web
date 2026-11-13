@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,12 +17,37 @@ import {
   Layers,
   ArrowLeft,
   Trash2,
+  ZoomIn,
 } from "lucide-react";
 import { fetchGenerations, deleteGeneration, unlockGenerationDownload, fetchWallet, type Generation, type Wallet } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { theme } from "@/lib/theme/themeGuard";
+import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
+import { DeleteConfirmationModal } from "@/components/ui/DeleteConfirmationModal";
 
 const S = theme.colors;
+
+function formatTimeAgo(dateStr: string) {
+  try {
+    const d = new Date(dateStr);
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return "just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return `${Math.floor(diffSec / 86400)}d ago`;
+  } catch {
+    return "recent";
+  }
+}
+
+function getAspectRatioValue(aspectRatio?: string): string {
+  if (!aspectRatio) return "1 / 1";
+  const r = aspectRatio.trim().toLowerCase();
+  if (r.includes("16:9")) return "16 / 9";
+  if (r.includes("9:16")) return "9 / 16";
+  if (r.includes("4:5")) return "4 / 5";
+  return "1 / 1";
+}
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -36,6 +61,22 @@ export default function LibraryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [filterTab, setFilterTab] = useState<"all" | "unlocked" | "cloud">("all");
+  const [lightboxJob, setLightboxJob] = useState<Generation | null>(null);
+  const [deleteModalJob, setDeleteModalJob] = useState<Generation | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [colCount, setColCount] = useState(3);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      if (w < 640) setColCount(2);
+      else if (w < 1024) setColCount(3);
+      else setColCount(4);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const loadData = async () => {
     const [gens, w] = await Promise.all([
@@ -105,6 +146,26 @@ export default function LibraryPage() {
     }
     return true;
   });
+
+  const cols = useMemo(() => {
+    const columns: Generation[][] = Array.from({ length: colCount }, () => []);
+    filtered.forEach((item, idx) => {
+      columns[idx % colCount].push(item);
+    });
+    return columns;
+  }, [filtered, colCount]);
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModalJob) return;
+    setIsDeleting(true);
+    try {
+      await deleteGeneration(deleteModalJob.id, userKey);
+      setGenerations((prev) => prev.filter((g) => g.id !== deleteModalJob.id));
+      setDeleteModalJob(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100%", background: S.bg, display: "flex", flexDirection: "column" }}>
@@ -269,139 +330,191 @@ export default function LibraryPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
               gap: "16px",
+              alignItems: "start",
             }}
           >
-            {filtered.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => router.push(`/library/${item.id}`)}
-                style={{
-                  background: S.card,
-                  border: `1px solid ${S.cardBorder}`,
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = S.cyan;
-                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = S.cardBorder;
-                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-                }}
-              >
-                {/* Image Preview Container */}
-                <div style={{ position: "relative", width: "100%", paddingTop: "100%", background: "#08080c" }}>
-                  <img
-                    src={item.image_url}
-                    alt={item.prompt}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                  {/* Status Pill Badge */}
+            {cols.map((colItems, colIdx) => (
+              <div key={colIdx} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {colItems.map((item) => (
                   <div
+                    key={item.id}
+                    onClick={() => router.push(`/library/${item.id}`)}
                     style={{
-                      position: "absolute",
-                      top: "10px",
-                      left: "10px",
-                      padding: "3px 8px",
-                      borderRadius: "6px",
-                      background: "rgba(0,0,0,0.75)",
-                      backdropFilter: "blur(6px)",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      color: item.is_download_unlocked ? S.success : S.cyan,
-                      border: `1px solid ${item.is_download_unlocked ? "rgba(16,185,129,0.4)" : "rgba(0,212,255,0.4)"}`,
+                      background: S.card,
+                      border: `1px solid ${S.cardBorder}`,
+                      borderRadius: "14px",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.borderColor = S.cyan;
+                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.borderColor = S.cardBorder;
+                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
                     }}
                   >
-                    {item.is_download_unlocked ? "Unlocked (4K Ready)" : "Cloud Saved (Free)"}
-                  </div>
-                </div>
-
-                {/* Info & Prompt */}
-                <div style={{ padding: "12px", display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between", gap: "10px" }}>
-                  <div>
-                    <p
+                    {/* Image Preview Container with Native Aspect Ratio */}
+                    <div
                       style={{
-                        margin: 0,
-                        fontSize: "12px",
-                        color: S.textPrimary,
-                        lineHeight: 1.4,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
+                        position: "relative",
+                        width: "100%",
+                        aspectRatio: getAspectRatioValue(item.aspect_ratio),
+                        background: "#08080c",
                         overflow: "hidden",
                       }}
-                      title={item.prompt}
                     >
-                      {item.prompt}
-                    </p>
-                    <span style={{ fontSize: "10px", color: S.textMuted, marginTop: "4px", display: "block" }}>
-                      {new Date(item.created_at).toLocaleDateString()} · {item.model || "FLUX.1 Schnell"}
-                    </span>
-                  </div>
+                      <img
+                        src={item.image_url}
+                        alt={item.prompt}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                      {/* Status Pill Badge */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          left: "10px",
+                          padding: "3px 8px",
+                          borderRadius: "6px",
+                          background: "rgba(0,0,0,0.75)",
+                          backdropFilter: "blur(6px)",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          color: item.is_download_unlocked ? S.success : S.cyan,
+                          border: `1px solid ${item.is_download_unlocked ? "rgba(16,185,129,0.4)" : "rgba(0,212,255,0.4)"}`,
+                        }}
+                      >
+                        {item.is_download_unlocked ? "Unlocked (4K Ready)" : "Cloud Saved (Free)"}
+                      </div>
 
-                  {/* Action Button: Re-Download (Free) or Download 4K (2 Cr) */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <button
-                      onClick={(e) => handleDownloadClick(item, e)}
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        padding: "8px",
-                        borderRadius: "8px",
-                        background: item.is_download_unlocked ? "rgba(16, 185, 129, 0.15)" : S.primary,
-                        border: item.is_download_unlocked ? "1px solid rgba(16, 185, 129, 0.4)" : "none",
-                        color: item.is_download_unlocked ? S.success : "#ffffff",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Download size={13} />
-                      <span>{item.is_download_unlocked ? "Re-Download (Free $0.00)" : "Download 4K (2 Cr)"}</span>
-                    </button>
+                      {/* Quick Zoom Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxJob(item);
+                        }}
+                        title="Zoom Fullscreen"
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          right: "10px",
+                          padding: "6px",
+                          borderRadius: "8px",
+                          background: "rgba(0,0,0,0.6)",
+                          backdropFilter: "blur(6px)",
+                          border: "1px solid rgba(255,255,255,0.15)",
+                          color: "#ffffff",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <ZoomIn size={13} />
+                      </button>
+                    </div>
 
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setGenerations((prev) => prev.filter((g) => g.id !== item.id));
-                        await deleteGeneration(item.id, userKey);
-                      }}
-                      title="Delete from Library"
-                      style={{
-                        padding: "8px",
-                        borderRadius: "8px",
-                        background: "rgba(255,255,255,0.04)",
-                        border: `1px solid ${S.borderLight}`,
-                        color: S.textMuted,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#ef4444")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = S.textMuted)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {/* Info & Prompt */}
+                    <div style={{ padding: "12px", display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between", gap: "10px" }}>
+                      <div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "12px",
+                            color: S.textPrimary,
+                            lineHeight: 1.4,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                          title={item.prompt}
+                        >
+                          {item.prompt}
+                        </p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
+                          {item.category && (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: "rgba(168, 85, 247, 0.15)",
+                                color: "#c084fc",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {item.category}
+                            </span>
+                          )}
+                          <span style={{ fontSize: "10px", color: S.textMuted }}>
+                            {formatTimeAgo(item.created_at)} • {item.aspect_ratio || "1:1"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Button: Re-Download (Free) or Download 4K (2 Cr) */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          onClick={(e) => handleDownloadClick(item, e)}
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            padding: "8px",
+                            borderRadius: "8px",
+                            background: item.is_download_unlocked ? "rgba(16, 185, 129, 0.15)" : S.primary,
+                            border: item.is_download_unlocked ? "1px solid rgba(16, 185, 129, 0.4)" : "none",
+                            color: item.is_download_unlocked ? S.success : "#ffffff",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Download size={13} />
+                          <span>{item.is_download_unlocked ? "Re-Download (Free $0.00)" : "Download 4K (2 Cr)"}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteModalJob(item);
+                          }}
+                          title="Delete from Library"
+                          style={{
+                            padding: "8px",
+                            borderRadius: "8px",
+                            background: "rgba(255,255,255,0.04)",
+                            border: `1px solid ${S.borderLight}`,
+                            color: S.textMuted,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#ef4444")}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = S.textMuted)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
             ))}
           </div>
@@ -528,6 +641,29 @@ export default function LibraryPage() {
           </div>
         </div>
       )}
+      {/* ── IMAGE LIGHTBOX MODAL ─────────────────────────────── */}
+      <ImageLightboxModal
+        isOpen={Boolean(lightboxJob)}
+        imageUrl={lightboxJob?.image_url || ""}
+        title={lightboxJob?.prompt || "Creation Master"}
+        subtitle={lightboxJob?.category || lightboxJob?.model || "AI Generation"}
+        aspectRatio={lightboxJob?.aspect_ratio}
+        isUnlocked={lightboxJob?.is_download_unlocked}
+        onClose={() => setLightboxJob(null)}
+        onDownload={() => {
+          if (lightboxJob) handleDownloadClick(lightboxJob);
+        }}
+      />
+
+      {/* ── DELETE CONFIRMATION MODAL ───────────────────────── */}
+      <DeleteConfirmationModal
+        isOpen={Boolean(deleteModalJob)}
+        title="Delete Creation"
+        description="Are you sure you want to permanently delete this creation from your Cloud Library? This action cannot be undone."
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteModalJob(null)}
+      />
     </div>
   );
 }

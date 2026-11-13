@@ -16,10 +16,12 @@ import {
   ChevronRight,
   ExternalLink,
   Bookmark,
+  ZoomIn,
 } from "lucide-react";
 import { fetchArtworkById, fetchArtworks, savePrivateArtwork, removePrivateArtwork, isArtworkBookmarked, type Artwork } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
 import { BACKEND_URL, fetchSimilarCreations } from "@/lib/api/backend-client";
+import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
 
 const S = theme.colors;
 
@@ -34,6 +36,7 @@ export default function ExploreDetailPage() {
   const [liked, setLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     if (!artworkId) return;
@@ -170,8 +173,25 @@ export default function ExploreDetailPage() {
 
   return (
     <div style={{ flex: 1, padding: "clamp(16px, 3vw, 32px)", maxWidth: "1400px", margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      {/* ── TOP BREADCRUMB & BACK ACTION ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+      {/* ── PERSISTENT PINNED BREADCRUMBS & TOP BAR (§5.4.1) ── */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px clamp(12px, 3vw, 24px)",
+          marginBottom: "24px",
+          gap: "12px",
+          flexWrap: "wrap",
+          background: "rgba(11, 11, 15, 0.9)",
+          backdropFilter: "blur(14px)",
+          borderBottom: `1px solid ${S.borderLight}`,
+          borderRadius: "0 0 16px 16px",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: S.textSecondary }}>
           <button
             onClick={() => router.push("/explore")}
@@ -291,6 +311,8 @@ export default function ExploreDetailPage() {
       >
         {/* Left: High-Res Image Display */}
         <div
+          onClick={() => setLightboxOpen(true)}
+          title="Click to open Full-Screen Zoomable Lightbox"
           style={{
             position: "relative",
             borderRadius: "16px",
@@ -302,6 +324,7 @@ export default function ExploreDetailPage() {
             justifyContent: "center",
             minHeight: "440px",
             maxHeight: "680px",
+            cursor: "zoom-in",
           }}
         >
           <img
@@ -317,6 +340,46 @@ export default function ExploreDetailPage() {
               userSelect: "none",
             }}
           />
+
+          {/* Pinch & Zoom Affordance Badge (§5.2.1 & §5.4.1) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxOpen(true);
+            }}
+            style={{
+              position: "absolute",
+              bottom: "14px",
+              right: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "9999px",
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+              color: "#ffffff",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
+              zIndex: 3,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
+              (e.currentTarget as HTMLButtonElement).style.color = S.cyan;
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.25)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+            }}
+          >
+            <ZoomIn size={12} />
+            <span>Pinch &amp; Zoom</span>
+          </button>
 
           {/* Interactive Category Badge Top-Left */}
           <button
@@ -748,6 +811,26 @@ export default function ExploreDetailPage() {
           ))}
         </div>
       </div>
+
+      {/* ── Full-Screen Zoomable Lightbox Modal (§5.2.1 & §6.3) ── */}
+      <ImageLightboxModal
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        imageUrl={artwork.image_url}
+        title={artwork.title || "Community Creation"}
+        subtitle={`${artwork.model || "FLUX.1 Schnell"} • By @${artwork.author_handle || "artist"}`}
+        aspectRatio={artwork.aspect_ratio || "1:1"}
+        onShare={handleShare}
+        onDownload={() => {
+          const a = document.createElement("a");
+          a.href = artwork.image_url;
+          a.download = `craftai-${artwork.id}.png`;
+          a.target = "_blank";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }}
+      />
     </div>
   );
 }
