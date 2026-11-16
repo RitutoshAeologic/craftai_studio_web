@@ -905,7 +905,17 @@ export async function initRemixSession(
       }
     );
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      return {
+        session_id: data.session_id || data.id,
+        anchor_image_url: data.anchor_image_url || params.anchor_image_url,
+        welcome_message:
+          data.welcome_message ||
+          data.messages?.[0]?.content ||
+          "Anchor image locked! How would you like to remix or transform this artwork?",
+        suggested_chips:
+          data.suggested_chips || data.messages?.[0]?.suggested_chips || [],
+      };
     }
   } catch (err) {
     console.warn("[initRemixSession] Fallback:", err);
@@ -947,7 +957,23 @@ export async function sendRemixChat(
       }
     );
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      return {
+        turn_count: data.turn_count || 1,
+        refined_prompt:
+          data.refined_prompt || data.compiled_prompt || params.user_instruction,
+        explanation:
+          data.explanation ||
+          data.assistant_message?.content ||
+          "Recipe updated for synthesis.",
+        diff_added: Array.isArray(data.assistant_message?.diff_added)
+          ? data.assistant_message.diff_added.join(", ")
+          : data.diff_added || params.user_instruction,
+        diff_removed: data.diff_removed || "",
+        suggested_chips:
+          data.suggested_chips || data.assistant_message?.suggested_chips || [],
+        latency_ms: data.latency_ms || 100,
+      };
     }
   } catch (err) {
     console.warn("[sendRemixChat] Fallback:", err);

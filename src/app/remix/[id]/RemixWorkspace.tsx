@@ -34,10 +34,12 @@ const QUICK_MODS = [
 export default function RemixWorkspace({
   referenceImage,
   initialPrompt,
+  remixedFromPromptId,
   onBack,
 }: {
   referenceImage: string;
   initialPrompt?: string;
+  remixedFromPromptId?: string;
   onBack?: () => void;
 }) {
   const { profile, user } = useUser();
@@ -197,7 +199,8 @@ export default function RemixWorkspace({
       try {
         const dispatchRes = await dispatchGeneration({
           prompt: `${refinedPrompt}, style weight ${styleWeight}`,
-          face_reference_urls: referenceImage.startsWith("http") ? [referenceImage] : null,
+          face_reference_urls: null, // Avoid passing general scene/cyberpunk artworks to face_reference_urls (§8.4)
+          remixed_from_prompt_id: remixedFromPromptId || null, // Auto-triggers 1.60 Credit royalty to original author (§8.3)
           model: "flux",
           width: 1024,
           height: 1024,

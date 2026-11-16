@@ -25,9 +25,16 @@ function RemixLaunchpadContent() {
     searchParams.get("prompt") ||
     searchParams.get("initialPrompt") ||
     "";
+  const queryPromptId =
+    searchParams.get("cardId") ||
+    searchParams.get("promptId") ||
+    searchParams.get("remixedFromPromptId") ||
+    searchParams.get("id") ||
+    null;
 
   const [activeRef, setActiveRef] = useState<string | null>(queryRef || null);
   const [activePrompt, setActivePrompt] = useState<string>(queryPrompt);
+  const [activePromptId, setActivePromptId] = useState<string | null>(queryPromptId);
   const [recentGens, setRecentGens] = useState<Generation[]>([]);
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -53,6 +60,7 @@ function RemixLaunchpadContent() {
       const dataUrl = e.target?.result as string;
       setActiveRef(dataUrl);
       setActivePrompt(`Remix of ${file.name.replace(/\.[^/.]+$/, "")}`);
+      setActivePromptId(null);
     };
     reader.readAsDataURL(file);
   };
@@ -63,7 +71,11 @@ function RemixLaunchpadContent() {
       <RemixWorkspace
         referenceImage={activeRef}
         initialPrompt={activePrompt}
-        onBack={() => setActiveRef(null)}
+        remixedFromPromptId={activePromptId || undefined}
+        onBack={() => {
+          setActiveRef(null);
+          setActivePromptId(null);
+        }}
       />
     );
   }

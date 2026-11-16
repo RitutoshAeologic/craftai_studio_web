@@ -13,20 +13,34 @@ import {
   Zap,
   Gift,
   History,
+  Loader2,
 } from "lucide-react";
-import { fetchWallet, topUpCredits, type Wallet } from "@/lib/supabase/db";
+import {
+  fetchWallet,
+  fetchCreditPackages,
+  fetchWalletLedger,
+  CANONICAL_CREDIT_PACKAGES,
+  type Wallet,
+  type CreditPackage,
+  type WalletLedgerItem,
+} from "@/lib/supabase/db";
+import { useRazorpayCheckout } from "@/lib/hooks/useRazorpayCheckout";
 import { useUser } from "@/context/UserContext";
 import { theme } from "@/lib/theme/themeGuard";
 
 const S = theme.colors;
 
-interface Transaction {
-  id: string;
-  type: "debit" | "credit";
-  amount: number;
-  description: string;
-  timestamp: string;
-  badge: string;
+function formatLedgerDate(isoStr: string) {
+  try {
+    const d = new Date(isoStr);
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return "Just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "Recent";
+  }
 }
 
 export default function WalletPage() {
@@ -39,101 +53,56 @@ export default function WalletPage() {
     purchased_balance: 80,
     earned_royalty_balance: 20,
   });
-  const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [packages, setPackages] = useState<CreditPackage[]>(CANONICAL_CREDIT_PACKAGES);
+  const [ledgerItems, setLedgerItems] = useState<WalletLedgerItem[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
 
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: "tx-1",
-      type: "credit",
-      amount: 40,
-      description: "Creator Royalty Payout — Community Remixes",
-      timestamp: "Today, 4:15 PM",
-      badge: "Creator Royalty",
-    },
-    {
-      id: "tx-2",
-      type: "debit",
-      amount: 2,
-      description: "Lossless 4K Master Export Unlocked",
-      timestamp: "Yesterday, 8:20 PM",
-      badge: "4K Paywall",
-    },
-    {
-      id: "tx-3",
-      type: "debit",
-      amount: 1,
-      description: "FLUX.1 Schnell Generation Dispatch",
-      timestamp: "Yesterday, 3:10 PM",
-      badge: "Image Gen",
-    },
-    {
-      id: "tx-4",
-      type: "credit",
-      amount: 50,
-      description: "Starter Credit Pack Purchase",
-      timestamp: "Sep 12, 2026",
-      badge: "Stripe Checkout",
-    },
-  ]);
+  const { startCheckout, isProcessing } = useRazorpayCheckout();
+
+  const loadAllData = async () => {
+    try {
+      const [w, pkgs, ledger] = await Promise.all([
+        fetchWallet(userKey),
+        fetchCreditPackages(),
+        fetchWalletLedger(userKey),
+      ]);
+      setWallet(w);
+      if (Array.isArray(pkgs) && pkgs.length > 0) setPackages(pkgs);
+      if (Array.isArray(ledger)) setLedgerItems(ledger);
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
 
   useEffect(() => {
-    fetchWallet(userKey).then(setWallet);
+    loadAllData();
+    const handleUpdate = () => {
+      fetchWallet(userKey).then(setWallet);
+      fetchWalletLedger(userKey).then(setLedgerItems);
+    };
+    window.addEventListener("craftai_wallet_updated", handleUpdate);
+    return () => window.removeEventListener("craftai_wallet_updated", handleUpdate);
   }, [userKey]);
 
-  const packages = [
-    {
-      id: "starter",
-      title: "Starter Pack",
-      credits: 50,
-      price: "$4.99",
-      perCredit: "$0.10 / credit",
-      popular: false,
-      badge: "Great for Beginners",
-    },
-    {
-      id: "pro",
-      title: "Pro Creator",
-      credits: 200,
-      price: "$14.99",
-      perCredit: "$0.07 / credit",
-      popular: true,
-      badge: "Most Popular • 25% Off",
-    },
-    {
-      id: "studio",
-      title: "Studio Master",
-      credits: 500,
-      price: "$29.99",
-      perCredit: "$0.06 / credit",
-      popular: false,
-      badge: "Best Value • 40% Off",
-    },
-  ];
-
-  const handlePurchase = async (pkg: typeof packages[0]) => {
-    setPurchasing(pkg.id);
-    // Simulate instant checkout / Stripe webhook credit
-    setTimeout(async () => {
-      const updated = await topUpCredits(pkg.credits, userKey);
-      setWallet(updated);
-
-      setTransactions((prev) => [
-        {
-          id: `tx-${Date.now()}`,
-          type: "credit",
-          amount: pkg.credits,
-          description: `${pkg.title} Purchase (${pkg.price})`,
-          timestamp: "Just now",
-          badge: "Stripe Checkout",
-        },
-        ...prev,
-      ]);
-
-      setPurchasing(null);
-      setPurchaseSuccess(`Successfully added +${pkg.credits} Credits to your wallet!`);
-      setTimeout(() => setPurchaseSuccess(null), 4000);
-    }, 800);
+  const handlePurchase = (pkg: CreditPackage) => {
+    const totalCredits = pkg.credits + (pkg.bonus_credits || 0);
+    startCheckout(
+      pkg,
+      {
+        id: user?.id || userKey,
+        email: profile.email || "creator@craftai.studio",
+        name: profile.name || "CraftAI Creator",
+      },
+      (res) => {
+        setPurchaseSuccess(`Payment successful! +${totalCredits} Credits added to your balance.`);
+        setTimeout(() => setPurchaseSuccess(null), 5000);
+        loadAllData();
+      },
+      (err) => {
+        console.warn("[Razorpay Checkout Failed]", err);
+      }
+    );
   };
 
   return (
@@ -146,7 +115,7 @@ export default function WalletPage() {
             Wallet &amp; Credits Ledger
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: S.textSecondary }}>
-            Manage your usable studio credits, track creator remix earnings, and top up safely.
+            Manage your usable studio credits, track creator remix earnings, and top up via Razorpay.
           </p>
         </div>
 
@@ -195,7 +164,7 @@ export default function WalletPage() {
               {Number(wallet?.purchased_balance ?? 80).toFixed(1)} Cr
             </div>
             <span style={{ fontSize: "11px", color: S.textMuted, display: "block", marginTop: "2px" }}>
-              Bought via Stripe Checkout
+              Bought via Razorpay Gateway
             </span>
           </div>
 
@@ -245,118 +214,162 @@ export default function WalletPage() {
 
         {/* ── Top-Up Packages ─────────────────────────────────── */}
         <div style={{ marginBottom: "36px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, marginBottom: "14px" }}>
-            Top-Up Credit Packages
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: 0 }}>
+              Dynamic Razorpay Top-Up Packages
+            </h2>
+            <span style={{ fontSize: "12px", color: S.textMuted }}>
+              Instant Atomic Credit Fulfillment
+            </span>
+          </div>
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "16px",
             }}
           >
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                style={{
-                  background: S.card,
-                  border: pkg.popular ? `1.5px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
-                  borderRadius: "16px",
-                  padding: "20px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  position: "relative",
-                  boxShadow: pkg.popular ? "0 8px 30px rgba(0, 212, 255, 0.18)" : "none",
-                }}
-              >
-                {/* Popular Pill */}
-                {pkg.popular && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-11px",
-                      right: "20px",
-                      background: S.cyan,
-                      color: "#000",
-                      padding: "2px 10px",
-                      borderRadius: "9999px",
-                      fontSize: "10px",
-                      fontWeight: 800,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Popular
-                  </div>
-                )}
+            {packages.map((pkg) => {
+              const totalCredits = pkg.credits + (pkg.bonus_credits || 0);
+              const perCredit = (pkg.price_inr / totalCredits).toFixed(2);
 
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: S.textPrimary }}>
-                      {pkg.title}
-                    </h3>
-                    <span style={{ fontSize: "11px", color: S.textMuted }}>{pkg.perCredit}</span>
-                  </div>
-
-                  <div style={{ margin: "14px 0" }}>
-                    <span style={{ fontSize: "32px", fontWeight: 800, color: S.textPrimary }}>
-                      {pkg.price}
-                    </span>
-                    <span style={{ fontSize: "13px", color: S.textSecondary, marginLeft: "6px" }}>
-                      / {pkg.credits} Credits
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: pkg.popular ? S.cyan : S.textSecondary,
-                      padding: "4px 8px",
-                      background: "rgba(255,255,255,0.03)",
-                      borderRadius: "6px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    {pkg.badge}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handlePurchase(pkg)}
-                  disabled={Boolean(purchasing)}
+              return (
+                <div
+                  key={pkg.id}
                   style={{
-                    width: "100%",
-                    padding: "11px",
-                    borderRadius: "10px",
-                    background: pkg.popular ? S.cyan : S.primary,
-                    border: "none",
-                    color: pkg.popular ? "#000000" : "#ffffff",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    cursor: purchasing ? "not-allowed" : "pointer",
+                    background: S.card,
+                    border: pkg.is_popular ? `1.5px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
+                    borderRadius: "16px",
+                    padding: "20px",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    transition: "all 0.15s",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    position: "relative",
+                    boxShadow: pkg.is_popular ? "0 8px 30px rgba(0, 212, 255, 0.18)" : "none",
                   }}
                 >
-                  <CreditCard size={14} />
-                  <span>{purchasing === pkg.id ? "Processing..." : `Get ${pkg.credits} Credits`}</span>
-                </button>
-              </div>
-            ))}
+                  {/* Popular Pill */}
+                  {pkg.is_popular && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "-11px",
+                        right: "20px",
+                        background: S.cyan,
+                        color: "#000",
+                        padding: "2px 10px",
+                        borderRadius: "9999px",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: S.textPrimary }}>
+                        {pkg.name}
+                      </h3>
+                      <span style={{ fontSize: "11px", color: S.textMuted }}>₹{perCredit}/cr</span>
+                    </div>
+
+                    <div style={{ margin: "14px 0" }}>
+                      <span style={{ fontSize: "30px", fontWeight: 800, color: S.textPrimary }}>
+                        ₹{pkg.price_inr}
+                      </span>
+                      <span style={{ fontSize: "13px", color: S.textSecondary, marginLeft: "6px" }}>
+                        / {totalCredits} Credits
+                      </span>
+                    </div>
+
+                    {pkg.bonus_credits > 0 && (
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: S.success,
+                          padding: "3px 8px",
+                          background: "rgba(16, 185, 129, 0.1)",
+                          borderRadius: "6px",
+                          marginBottom: "10px",
+                          display: "inline-block",
+                        }}
+                      >
+                        +{pkg.bonus_credits} Bonus Credits Included
+                      </div>
+                    )}
+
+                    {pkg.badge && (
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: pkg.is_popular ? S.cyan : S.textSecondary,
+                          padding: "4px 8px",
+                          background: "rgba(255,255,255,0.03)",
+                          borderRadius: "6px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        {pkg.badge}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handlePurchase(pkg)}
+                    disabled={isProcessing}
+                    style={{
+                      width: "100%",
+                      padding: "11px",
+                      borderRadius: "10px",
+                      background: pkg.is_popular ? S.cyan : S.primary,
+                      border: "none",
+                      color: pkg.is_popular ? "#000000" : "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: isProcessing ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.15s",
+                      opacity: isProcessing ? 0.7 : 1,
+                    }}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Connecting Razorpay...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard size={14} />
+                        <span>Get {totalCredits} Credits</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* ── Transaction History ─────────────────────────────── */}
+        {/* ── Transaction History / Wallet Passbook Ledger ──────── */}
         <div>
-          <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <History size={16} style={{ color: S.textSecondary }} />
-            Recent Activity &amp; Royalty Earnings
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <History size={16} style={{ color: S.textSecondary }} />
+              Wallet Passbook &amp; Activity Ledger
+            </h2>
+            <span style={{ fontSize: "12px", color: S.textMuted }}>
+              Audited by PostgreSQL Ledger
+            </span>
+          </div>
 
           <div
             style={{
@@ -366,54 +379,76 @@ export default function WalletPage() {
               overflow: "hidden",
             }}
           >
-            {transactions.map((tx, idx) => (
-              <div
-                key={tx.id}
-                style={{
-                  padding: "14px 18px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  borderBottom: idx === transactions.length - 1 ? "none" : `1px solid ${S.borderLight}`,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {ledgerItems.length === 0 ? (
+              <div style={{ padding: "30px", textAlign: "center", color: S.textMuted, fontSize: "13px" }}>
+                No wallet transactions recorded yet.
+              </div>
+            ) : (
+              ledgerItems.map((item, idx) => {
+                const isCredit = item.amount >= 0;
+                return (
                   <div
+                    key={item.id}
                     style={{
-                      width: "32px",
-                      height: "32px",
-                      borderRadius: "50%",
-                      background: tx.type === "credit" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                      padding: "14px 18px",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      color: tx.type === "credit" ? S.success : "#f87171",
+                      justifyContent: "space-between",
+                      borderBottom: idx === ledgerItems.length - 1 ? "none" : `1px solid ${S.borderLight}`,
                     }}
                   >
-                    {tx.type === "credit" ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                  </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          background: isCredit ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: isCredit ? S.success : "#f87171",
+                        }}
+                      >
+                        {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                      </div>
 
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: S.textPrimary }}>
-                      {tx.description}
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: S.textPrimary }}>
+                          {item.description}
+                        </div>
+                        <div style={{ fontSize: "11px", color: S.textMuted }}>
+                          {formatLedgerDate(item.created_at)} ·{" "}
+                          <span style={{ color: S.textSecondary, textTransform: "capitalize" }}>
+                            {item.event_type.replace(/_/g, " ")}
+                          </span>
+                          {item.reference_id && (
+                            <span style={{ marginLeft: "6px", color: S.cyan }}>
+                              • Ref: {item.reference_id.slice(0, 16)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: "11px", color: S.textMuted }}>
-                      {tx.timestamp} · <span style={{ color: S.textSecondary }}>{tx.badge}</span>
+
+                    <div style={{ textAlign: "right" }}>
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          color: isCredit ? S.success : S.textPrimary,
+                        }}
+                      >
+                        {isCredit ? `+${item.amount}` : `${item.amount}`} Cr
+                      </div>
+                      <div style={{ fontSize: "11px", color: S.textMuted }}>
+                        Balance: {item.balance_after} Cr
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 700,
-                    color: tx.type === "credit" ? S.success : S.textPrimary,
-                  }}
-                >
-                  {tx.type === "credit" ? `+${tx.amount}` : `-${tx.amount}`} Cr
-                </div>
-              </div>
-            ))}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

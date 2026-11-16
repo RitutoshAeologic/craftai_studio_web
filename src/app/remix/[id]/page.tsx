@@ -35,6 +35,7 @@ export default function RemixPage({ params }: { params: Promise<{ id: string }> 
     <RemixWorkspace
       referenceImage={refUrl}
       initialPrompt={artwork ? `Remix of "${artwork.title}": ${artwork.prompt}` : undefined}
+      remixedFromPromptId={artwork?.id || id}
       onBack={() => router.push("/remix")}
     />
   );
