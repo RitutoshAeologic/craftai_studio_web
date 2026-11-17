@@ -309,7 +309,7 @@ export function setThemePreset(preset: ThemePresetName): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("craftai_theme_preset", preset);
-    } catch {}
+    } catch { }
   }
   listeners.forEach((listener) => listener(activeColors));
 }
@@ -325,7 +325,7 @@ export function initTheme(): void {
       setThemePreset(saved);
       return;
     }
-  } catch {}
+  } catch { }
   applyThemeToCssVariables(activeColors);
 }
 

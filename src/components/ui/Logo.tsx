@@ -26,10 +26,20 @@ function LogoMark({ size = "md" }: { size?: LogoProps["size"] }) {
         ✦
       </div>
       {/* Wordmark */}
-      <span className={`font-black tracking-tight text-white ${s.text}`}
-        style={{ fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}>
+      <span
+        className={`font-black tracking-tight ${s.text}`}
+        style={{
+          color: "var(--text-primary, #ffffff)",
+          fontFamily: "var(--font-outfit, Outfit, sans-serif)",
+        }}
+      >
         Craft<span style={{ color: "#00f2fe" }}>AI</span>{" "}
-        <span className="font-light text-[#94a3b8]">Studio</span>
+        <span
+          className="font-light"
+          style={{ color: "var(--text-muted, #94a3b8)" }}
+        >
+          Studio
+        </span>
       </span>
     </div>
   );

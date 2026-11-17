@@ -6,11 +6,12 @@ import Logo from "@/components/ui/Logo";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, Sparkles, AlertCircle, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/context/ThemeContext";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
   if (password.length === 0) return { score: 0, label: "", color: "" };
   let score = 0;
-  if (password.length >= 8) score++;
+  if (password.length >= 6) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
@@ -22,6 +23,7 @@ function getPasswordStrength(password: string): { score: number; label: string; 
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,6 +44,10 @@ export default function RegisterPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     if (!agreed) { setError("Please agree to the Terms of Service to continue."); return; }
     setLoading(true);
     setError(null);
@@ -91,9 +97,12 @@ export default function RegisterPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl text-center animate-fade-in-up"
         style={{
-          background: "var(--bg-surface, #151d2f)",
-          border: "1px solid var(--border-default, #222f4c)",
+          background: colors.surface,
+          border: `1px solid ${colors.borderLight}`,
           padding: "40px 36px",
+          boxShadow: colors.isDark
+            ? "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.05)"
+            : "0 20px 50px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05)",
         }}
       >
         <div
@@ -102,11 +111,11 @@ export default function RegisterPage() {
         >
           <CheckCircle2 className="w-8 h-8" style={{ color: "#10b981" }} />
         </div>
-        <h2 className="text-xl font-bold mb-3" style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit)" }}>
+        <h2 className="text-xl font-bold mb-3" style={{ color: colors.textPrimary, fontFamily: "var(--font-outfit)" }}>
           Check your email!
         </h2>
-        <p className="text-sm mb-6" style={{ color: "var(--text-secondary, #94a3b8)" }}>
-          We&apos;ve sent a confirmation link to <strong style={{ color: "var(--text-primary, #ffffff)" }}>{email}</strong>. Click it to activate your account.
+        <p className="text-sm mb-6" style={{ color: colors.textSecondary }}>
+          We&apos;ve sent a confirmation link to <strong style={{ color: colors.textPrimary }}>{email}</strong>. Click it to activate your account.
         </p>
         <div className="flex flex-col gap-3">
           <Link
@@ -122,9 +131,9 @@ export default function RegisterPage() {
             style={{
               padding: "12px",
               borderRadius: "10px",
-              background: "rgba(99, 102, 241, 0.15)",
-              border: "1px solid rgba(99, 102, 241, 0.3)",
-              color: "#ffffff",
+              background: colors.isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.08)",
+              border: colors.isDark ? "1px solid rgba(99, 102, 241, 0.3)" : "1px solid rgba(99, 102, 241, 0.25)",
+              color: colors.isDark ? "#ffffff" : colors.primary,
               fontSize: "13px",
               fontWeight: 600,
               cursor: "pointer",
@@ -148,11 +157,13 @@ export default function RegisterPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl top-accent-border animate-fade-in-up"
         style={{
-          background: "var(--bg-surface, #151d2f)",
-          border: "1px solid var(--border-default, #222f4c)",
+          background: colors.surface,
+          border: `1px solid ${colors.borderLight}`,
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.05)",
+          boxShadow: colors.isDark
+            ? "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.05)"
+            : "0 20px 50px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05)",
           padding: "40px 36px",
         }}
       >
@@ -160,11 +171,11 @@ export default function RegisterPage() {
         <div className="text-center mb-6">
           <h1
             className="text-2xl font-bold mb-2"
-            style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
+            style={{ color: colors.textPrimary, fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
           >
             Create Your Account
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary, #94a3b8)" }}>
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
             Start generating &amp; remixing AI artwork for free
           </p>
         </div>
@@ -179,29 +190,39 @@ export default function RegisterPage() {
             padding: "12px 16px",
             marginBottom: "20px",
             borderRadius: "12px",
-            background: "linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)",
-            border: "1px solid rgba(0, 212, 255, 0.4)",
+            background: colors.isDark
+              ? "linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)"
+              : "rgba(99, 102, 241, 0.08)",
+            border: colors.isDark
+              ? "1px solid rgba(0, 212, 255, 0.4)"
+              : "1px solid rgba(99, 102, 241, 0.25)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
-            color: "#ffffff",
+            color: colors.isDark ? "#ffffff" : colors.primary,
             fontSize: "14px",
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 0 20px rgba(0, 212, 255, 0.2)",
+            boxShadow: colors.isDark ? "0 0 20px rgba(0, 212, 255, 0.2)" : "none",
             transition: "all 0.15s",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 25px rgba(0, 212, 255, 0.35)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = colors.isDark ? "#00d4ff" : colors.primary;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = colors.isDark
+              ? "0 0 25px rgba(0, 212, 255, 0.35)"
+              : "0 4px 14px rgba(99, 102, 241, 0.15)";
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0, 212, 255, 0.4)";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(0, 212, 255, 0.2)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = colors.isDark
+              ? "rgba(0, 212, 255, 0.4)"
+              : "rgba(99, 102, 241, 0.25)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = colors.isDark
+              ? "0 0 20px rgba(0, 212, 255, 0.2)"
+              : "none";
           }}
         >
-          <Sparkles size={16} style={{ color: "#00d4ff" }} />
+          <Sparkles size={16} style={{ color: colors.cyan }} />
           <span>⚡ 1-Click Demo Login (Alex Rivera)</span>
         </button>
 
@@ -219,7 +240,8 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* Social OAuth buttons */}
+        {/* Social OAuth buttons (Commented out as requested) */}
+        {/*
         <div style={{
           marginBottom: "24px",
           padding: "16px",
@@ -265,18 +287,18 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Divider */}
         <div className="divider-label mb-6">or register with email</div>
+        */}
 
         {/* Form */}
         <form onSubmit={handleSignUp} className="flex flex-col gap-4">
           {/* Full Name */}
           <div>
-            <label htmlFor="reg-fullname" className="block text-xs font-medium mb-1.5" style={{ color: "#94a3b8" }}>
+            <label htmlFor="reg-fullname" className="block text-xs font-medium mb-1.5" style={{ color: colors.textSecondary }}>
               Full name
             </label>
             <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#475569" }} />
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: colors.textMuted }} />
               <input
                 id="reg-fullname"
                 type="text"
@@ -291,11 +313,11 @@ export default function RegisterPage() {
 
           {/* Email */}
           <div>
-            <label htmlFor="reg-email" className="block text-xs font-medium mb-1.5" style={{ color: "#94a3b8" }}>
+            <label htmlFor="reg-email" className="block text-xs font-medium mb-1.5" style={{ color: colors.textSecondary }}>
               Email address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#475569" }} />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: colors.textMuted }} />
               <input
                 id="reg-email"
                 type="email"
@@ -310,25 +332,26 @@ export default function RegisterPage() {
 
           {/* Password */}
           <div>
-            <label htmlFor="reg-password" className="block text-xs font-medium mb-1.5" style={{ color: "#94a3b8" }}>
+            <label htmlFor="reg-password" className="block text-xs font-medium mb-1.5" style={{ color: colors.textSecondary }}>
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#475569" }} />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: colors.textMuted }} />
               <input
                 id="reg-password"
                 type={showPassword ? "text" : "password"}
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 chars, 1 uppercase, 1 number"
+                placeholder="Minimum 6 characters"
                 className="glass-input w-full pl-10 pr-10 py-3 rounded-xl text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors duration-150"
-                style={{ color: "#475569" }}
+                style={{ color: colors.textMuted }}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -346,7 +369,7 @@ export default function RegisterPage() {
                         background:
                           strength.score >= level
                             ? strength.color
-                            : "rgba(255,255,255,0.1)",
+                            : colors.isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
                       }}
                     />
                   ))}
@@ -369,15 +392,15 @@ export default function RegisterPage() {
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
               className="mt-0.5 rounded cursor-pointer"
-              style={{ accentColor: "#00f2fe" }}
+              style={{ accentColor: colors.primary }}
             />
-            <label htmlFor="reg-terms" className="text-xs leading-relaxed" style={{ color: "#64748b" }}>
+            <label htmlFor="reg-terms" className="text-xs leading-relaxed" style={{ color: colors.textSecondary }}>
               I agree to the{" "}
-              <Link href="#" className="underline" style={{ color: "#94a3b8" }}>
+              <Link href="#" className="underline" style={{ color: colors.primary }}>
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="#" className="underline" style={{ color: "#94a3b8" }}>
+              <Link href="#" className="underline" style={{ color: colors.primary }}>
                 Privacy Policy
               </Link>
             </label>
@@ -405,12 +428,12 @@ export default function RegisterPage() {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-xs mt-6" style={{ color: "#64748b" }}>
+        <p className="text-center text-xs mt-6" style={{ color: colors.textSecondary }}>
           Already have an account?{" "}
           <Link
             href="/auth/login"
             className="font-semibold transition-colors duration-150"
-            style={{ color: "#00f2fe" }}
+            style={{ color: colors.cyan }}
           >
             Sign in
           </Link>

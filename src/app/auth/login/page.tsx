@@ -6,9 +6,11 @@ import Logo from "@/components/ui/Logo";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, Sparkles, AlertCircle, X, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +27,10 @@ export default function LoginPage() {
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -72,11 +78,13 @@ export default function LoginPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl top-accent-border animate-fade-in-up"
         style={{
-          background: "var(--bg-surface, #151d2f)",
-          border: "1px solid var(--border-default, #222f4c)",
+          background: colors.surface,
+          border: `1px solid ${colors.borderLight}`,
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,242,254,0.05)",
+          boxShadow: colors.isDark
+            ? "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,242,254,0.05)"
+            : "0 20px 50px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05)",
           padding: "40px 36px",
         }}
       >
@@ -84,11 +92,11 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <h1
             className="text-2xl font-bold mb-2"
-            style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
+            style={{ color: colors.textPrimary, fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
           >
             Welcome Back
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary, #94a3b8)" }}>
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
             Sign in to your AI Creator Workspace
           </p>
         </div>
@@ -103,29 +111,39 @@ export default function LoginPage() {
             padding: "12px 16px",
             marginBottom: "20px",
             borderRadius: "12px",
-            background: "linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)",
-            border: "1px solid rgba(0, 212, 255, 0.4)",
+            background: colors.isDark
+              ? "linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)"
+              : "rgba(99, 102, 241, 0.08)",
+            border: colors.isDark
+              ? "1px solid rgba(0, 212, 255, 0.4)"
+              : "1px solid rgba(99, 102, 241, 0.25)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
-            color: "#ffffff",
+            color: colors.isDark ? "#ffffff" : colors.primary,
             fontSize: "14px",
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 0 20px rgba(0, 212, 255, 0.2)",
+            boxShadow: colors.isDark ? "0 0 20px rgba(0, 212, 255, 0.2)" : "none",
             transition: "all 0.15s",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 25px rgba(0, 212, 255, 0.35)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = colors.isDark ? "#00d4ff" : colors.primary;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = colors.isDark
+              ? "0 0 25px rgba(0, 212, 255, 0.35)"
+              : "0 4px 14px rgba(99, 102, 241, 0.15)";
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0, 212, 255, 0.4)";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(0, 212, 255, 0.2)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = colors.isDark
+              ? "rgba(0, 212, 255, 0.4)"
+              : "rgba(99, 102, 241, 0.25)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = colors.isDark
+              ? "0 0 20px rgba(0, 212, 255, 0.2)"
+              : "none";
           }}
         >
-          <Sparkles size={16} style={{ color: "#00d4ff" }} />
+          <Sparkles size={16} style={{ color: colors.cyan }} />
           <span>⚡ 1-Click Demo Login (Alex Rivera)</span>
         </button>
 
@@ -143,7 +161,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Social OAuth buttons */}
+        {/* Social OAuth buttons (Commented out as requested) */}
+        {/*
         <div style={{
           marginBottom: "24px",
           padding: "16px",
@@ -152,7 +171,6 @@ export default function LoginPage() {
           borderRadius: "12px",
         }}>
           <div className="flex flex-col gap-3">
-            {/* Google */}
             <button
               id="login-google-btn"
               onClick={() => handleOAuth("google")}
@@ -172,7 +190,6 @@ export default function LoginPage() {
               Continue with Google
             </button>
 
-            {/* GitHub */}
             <button
               id="login-github-btn"
               onClick={() => handleOAuth("github")}
@@ -191,18 +208,18 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Divider */}
         <div className="divider-label mb-6">or continue with email</div>
+        */}
 
         {/* Email/Password Form */}
         <form onSubmit={handleEmailSignIn} className="flex flex-col gap-4">
           {/* Email */}
           <div>
-            <label htmlFor="login-email" className="block text-xs font-medium mb-1.5" style={{ color: "#94a3b8" }}>
+            <label htmlFor="login-email" className="block text-xs font-medium mb-1.5" style={{ color: colors.textSecondary }}>
               Email address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#475569" }} />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: colors.textMuted }} />
               <input
                 id="login-email"
                 type="email"
@@ -218,33 +235,34 @@ export default function LoginPage() {
           {/* Password */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="login-password" className="block text-xs font-medium" style={{ color: "#94a3b8" }}>
+              <label htmlFor="login-password" className="block text-xs font-medium" style={{ color: colors.textSecondary }}>
                 Password
               </label>
               <Link
                 href="/auth/forgot-password"
                 className="text-xs transition-colors duration-150"
-                style={{ color: "#00f2fe" }}
+                style={{ color: colors.cyan }}
               >
                 Forgot password?
               </Link>
             </div>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#475569" }} />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: colors.textMuted }} />
               <input
                 id="login-password"
                 type={showPassword ? "text" : "password"}
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Minimum 6 characters"
                 className="glass-input w-full pl-10 pr-10 py-3 rounded-xl text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors duration-150"
-                style={{ color: "#475569" }}
+                style={{ color: colors.textMuted }}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -273,12 +291,12 @@ export default function LoginPage() {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-xs mt-6" style={{ color: "#64748b" }}>
+        <p className="text-center text-xs mt-6" style={{ color: colors.textSecondary }}>
           Don&apos;t have an account?{" "}
           <Link
             href="/auth/register"
             className="font-semibold transition-colors duration-150"
-            style={{ color: "#00f2fe" }}
+            style={{ color: colors.cyan }}
           >
             Create one free
           </Link>
