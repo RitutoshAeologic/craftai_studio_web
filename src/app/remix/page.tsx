@@ -11,9 +11,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { fetchGenerations, fetchArtworks, isCreativeToolGeneration, type Generation, type Artwork } from "@/lib/supabase/db";
+import { useTheme } from "@/context/ThemeContext";
 import RemixWorkspace from "./[id]/RemixWorkspace";
 
 function RemixLaunchpadContent() {
+  const { colors: S } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryRef =
@@ -85,7 +87,7 @@ function RemixLaunchpadContent() {
     <div
       style={{
         minHeight: "100%",
-        background: "#0a0e18",
+        background: S.background,
         padding: "36px 32px 60px",
         display: "flex",
         flexDirection: "column",
@@ -119,7 +121,7 @@ function RemixLaunchpadContent() {
           style={{
             fontSize: "clamp(26px, 4vw, 36px)",
             fontWeight: 800,
-            color: "#ffffff",
+            color: S.textPrimary,
             letterSpacing: "-0.02em",
             margin: "0 0 12px",
             fontFamily: "var(--font-outfit, Outfit, sans-serif)",
@@ -127,7 +129,7 @@ function RemixLaunchpadContent() {
         >
           Select an Artwork to Remix
         </h1>
-        <p style={{ fontSize: "14px", color: "#94a3b8", lineHeight: "1.6", margin: 0 }}>
+        <p style={{ fontSize: "14px", color: S.textSecondary, lineHeight: "1.6", margin: 0 }}>
           Remix Lab transforms existing artwork by adjusting style, lighting, and palette while using the original composition as a visual anchor. Upload your own image or choose from creations below.
         </p>
       </div>
@@ -145,8 +147,8 @@ function RemixLaunchpadContent() {
         style={{
           padding: "36px 24px",
           borderRadius: "16px",
-          background: isDragging ? "rgba(0, 212, 255, 0.08)" : "rgba(22, 29, 43, 0.5)",
-          border: isDragging ? "2px dashed #00d4ff" : "1.5px dashed #222f4c",
+          background: isDragging ? "rgba(0, 212, 255, 0.08)" : S.isDark ? "rgba(22, 29, 43, 0.5)" : S.surface,
+          border: isDragging ? "2px dashed #00d4ff" : `1.5px dashed ${S.borderLight}`,
           cursor: "pointer",
           textAlign: "center",
           transition: "all 0.2s ease",
@@ -158,8 +160,8 @@ function RemixLaunchpadContent() {
         }}
         onMouseLeave={(e) => {
           if (!isDragging) {
-            (e.currentTarget as HTMLDivElement).style.borderColor = "#222f4c";
-            (e.currentTarget as HTMLDivElement).style.background = "rgba(22, 29, 43, 0.5)";
+            (e.currentTarget as HTMLDivElement).style.borderColor = S.borderLight;
+            (e.currentTarget as HTMLDivElement).style.background = S.isDark ? "rgba(22, 29, 43, 0.5)" : S.surface;
           }
         }}
       >
@@ -177,10 +179,10 @@ function RemixLaunchpadContent() {
         >
           <Upload size={24} style={{ color: "#00d4ff" }} />
         </div>
-        <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc", margin: "0 0 6px" }}>
+        <h3 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: "0 0 6px" }}>
           Drop any image here to remix
         </h3>
-        <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 16px" }}>
+        <p style={{ fontSize: "13px", color: S.textMuted, margin: "0 0 16px" }}>
           or click to browse from your device · PNG, JPG, WebP supported
         </p>
         <button
@@ -214,7 +216,7 @@ function RemixLaunchpadContent() {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
             <History size={16} style={{ color: "#00d4ff" }} />
-            <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#f1f5f9", margin: 0 }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: 0 }}>
               Remix from Your Recent Generations
             </h2>
           </div>
@@ -234,8 +236,8 @@ function RemixLaunchpadContent() {
                   setActivePrompt(gen.prompt);
                 }}
                 style={{
-                  background: "#111827",
-                  border: "1px solid #1e293b",
+                  background: S.surface,
+                  border: `1px solid ${S.borderLight}`,
                   borderRadius: "12px",
                   overflow: "hidden",
                   cursor: "pointer",
@@ -246,11 +248,11 @@ function RemixLaunchpadContent() {
                   (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#1e293b";
+                  (e.currentTarget as HTMLDivElement).style.borderColor = S.borderLight;
                   (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
                 }}
               >
-                <div style={{ height: "160px", width: "100%", background: "#0b0f19", position: "relative" }}>
+                <div style={{ height: "160px", width: "100%", background: S.isDark ? "#0b0f19" : S.surfaceLight, position: "relative" }}>
                   <img
                     src={gen.image_url}
                     alt={gen.prompt}
@@ -277,7 +279,7 @@ function RemixLaunchpadContent() {
                   <p
                     style={{
                       fontSize: "12px",
-                      color: "#cbd5e1",
+                      color: S.textPrimary,
                       margin: "0 0 10px",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -322,7 +324,7 @@ function RemixLaunchpadContent() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <LayoutGrid size={16} style={{ color: "#6366f1" }} />
-            <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#f1f5f9", margin: 0 }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: 0 }}>
               Or Choose from Community Showcase
             </h2>
           </div>
@@ -349,8 +351,8 @@ function RemixLaunchpadContent() {
                 router.push(`/remix/${art.id}`);
               }}
               style={{
-                background: "#111827",
-                border: "1px solid #1e293b",
+                background: S.surface,
+                border: `1px solid ${S.borderLight}`,
                 borderRadius: "12px",
                 overflow: "hidden",
                 cursor: "pointer",
@@ -361,11 +363,11 @@ function RemixLaunchpadContent() {
                 (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = "#1e293b";
+                (e.currentTarget as HTMLDivElement).style.borderColor = S.borderLight;
                 (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
               }}
             >
-              <div style={{ height: "160px", width: "100%", background: "#0b0f19", position: "relative" }}>
+              <div style={{ height: "160px", width: "100%", background: S.isDark ? "#0b0f19" : S.surfaceLight, position: "relative" }}>
                 <img
                   src={art.image_url || art.fallback_url}
                   alt={art.title}
@@ -389,13 +391,13 @@ function RemixLaunchpadContent() {
               </div>
 
               <div style={{ padding: "12px" }}>
-                <p style={{ fontSize: "13px", fontWeight: 700, color: "#f1f5f9", margin: "0 0 4px" }}>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: S.textPrimary, margin: "0 0 4px" }}>
                   {art.title}
                 </p>
                 <p
                   style={{
                     fontSize: "11px",
-                    color: "#64748b",
+                    color: S.textMuted,
                     margin: "0 0 10px",
                     overflow: "hidden",
                     textOverflow: "ellipsis",

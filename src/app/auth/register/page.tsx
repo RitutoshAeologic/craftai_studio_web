@@ -91,8 +91,8 @@ export default function RegisterPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl text-center animate-fade-in-up"
         style={{
-          background: "#151d2f",
-          border: "1px solid #222f4c",
+          background: "var(--bg-surface, #151d2f)",
+          border: "1px solid var(--border-default, #222f4c)",
           padding: "40px 36px",
         }}
       >
@@ -102,11 +102,11 @@ export default function RegisterPage() {
         >
           <CheckCircle2 className="w-8 h-8" style={{ color: "#10b981" }} />
         </div>
-        <h2 className="text-xl font-bold text-white mb-3" style={{ fontFamily: "var(--font-outfit)" }}>
+        <h2 className="text-xl font-bold mb-3" style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit)" }}>
           Check your email!
         </h2>
-        <p className="text-sm mb-6" style={{ color: "#94a3b8" }}>
-          We&apos;ve sent a confirmation link to <strong className="text-white">{email}</strong>. Click it to activate your account.
+        <p className="text-sm mb-6" style={{ color: "var(--text-secondary, #94a3b8)" }}>
+          We&apos;ve sent a confirmation link to <strong style={{ color: "var(--text-primary, #ffffff)" }}>{email}</strong>. Click it to activate your account.
         </p>
         <div className="flex flex-col gap-3">
           <Link
@@ -148,8 +148,8 @@ export default function RegisterPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl top-accent-border animate-fade-in-up"
         style={{
-          background: "#151d2f",
-          border: "1px solid #222f4c",
+          background: "var(--bg-surface, #151d2f)",
+          border: "1px solid var(--border-default, #222f4c)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.05)",
@@ -159,12 +159,12 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="text-center mb-6">
           <h1
-            className="text-2xl font-bold text-white mb-2"
-            style={{ fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
+            className="text-2xl font-bold mb-2"
+            style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
           >
             Create Your Account
           </h1>
-          <p className="text-sm" style={{ color: "#94a3b8" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary, #94a3b8)" }}>
             Start generating &amp; remixing AI artwork for free
           </p>
         </div>

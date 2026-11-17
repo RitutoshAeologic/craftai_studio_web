@@ -16,8 +16,7 @@ import {
 import { compileChatDelta, type ChatDeltaResponse } from "@/lib/api/backend-client";
 import { safeUUID } from "@/lib/utils/uuid";
 import { theme } from "@/lib/theme/themeGuard";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 interface CopilotMessage {
   id: string;
@@ -67,6 +66,7 @@ export default function PromptCopilotModal({
   onApplyPrompt,
   onGenerateNow,
 }: Props) {
+  const { colors: S } = useTheme();
   const [activeBasePrompt, setActiveBasePrompt] = useState(initialPrompt || "Cinematic visual masterpiece");
   const [selectedEngine, setSelectedEngine] = useState("gemini");
   const [turnCount, setTurnCount] = useState(0);
@@ -195,14 +195,16 @@ export default function PromptCopilotModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#0c0f17",
+          background: S.surface,
           border: `1.5px solid ${S.borderLight}`,
           borderRadius: "20px",
           width: "min(680px, 98vw)",
           height: "min(840px, 92vh)",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 212, 255, 0.15)",
+          boxShadow: S.isDark
+            ? "0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 212, 255, 0.15)"
+            : "0 24px 60px rgba(15, 23, 42, 0.18)",
           overflow: "hidden",
         }}
       >
@@ -214,7 +216,7 @@ export default function PromptCopilotModal({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "#090c12",
+            background: S.surfaceLight,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -239,7 +241,7 @@ export default function PromptCopilotModal({
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <Sparkles size={16} style={{ color: S.cyan }} />
-                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff", margin: 0 }}>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: S.textPrimary, margin: 0 }}>
                   Prompt Copilot
                 </h2>
               </div>
@@ -266,10 +268,10 @@ export default function PromptCopilotModal({
         </div>
 
         {/* ── ACTIVE BASE PROMPT PINNED CARD ── */}
-        <div style={{ padding: "14px 20px 10px", background: "#0c0f17", borderBottom: `1px solid ${S.borderLight}` }}>
+        <div style={{ padding: "14px 20px 10px", background: S.surfaceLight, borderBottom: `1px solid ${S.borderLight}` }}>
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.03)",
+              background: S.surface,
               border: `1px solid ${S.borderLight}`,
               borderRadius: "12px",
               padding: "10px 14px",
@@ -282,7 +284,7 @@ export default function PromptCopilotModal({
               style={{
                 margin: 0,
                 fontSize: "13px",
-                color: "#f1f5f9",
+                color: S.textPrimary,
                 lineHeight: 1.45,
                 maxHeight: "68px",
                 overflowY: "auto",
@@ -471,7 +473,7 @@ export default function PromptCopilotModal({
         </div>
 
         {/* ── BOTTOM INPUT & ACTION FOOTER ── */}
-        <div style={{ padding: "12px 20px 16px", borderTop: `1px solid ${S.borderLight}`, background: "#090c12" }}>
+        <div style={{ padding: "12px 20px 16px", borderTop: `1px solid ${S.borderLight}`, background: S.surfaceLight }}>
           {/* Quick Suggestion Pills Bar */}
           <div style={{ display: "flex", gap: "6px", overflowX: "auto", marginBottom: "10px", paddingBottom: "2px" }}>
             {suggestionChips.map((chip, idx) => (
@@ -482,9 +484,9 @@ export default function PromptCopilotModal({
                 style={{
                   padding: "4px 10px",
                   borderRadius: "9999px",
-                  background: "rgba(255, 255, 255, 0.05)",
+                  background: S.surface,
                   border: `1px solid ${S.borderLight}`,
-                  color: "#cbd5e1",
+                  color: S.textSecondary,
                   fontSize: "11px",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   whiteSpace: "nowrap",
@@ -501,7 +503,7 @@ export default function PromptCopilotModal({
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              background: "#121622",
+              background: S.surface,
               border: `1px solid ${S.borderLight}`,
               borderRadius: "12px",
               padding: "4px 8px 4px 14px",
@@ -525,7 +527,7 @@ export default function PromptCopilotModal({
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: "#ffffff",
+                color: S.textPrimary,
                 fontSize: "13px",
               }}
             />

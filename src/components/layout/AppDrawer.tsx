@@ -10,68 +10,45 @@ import {
   LayoutGrid,
   Wand2,
   Plus,
-  PanelLeftClose,
-  PanelLeftOpen,
-  History,
-  Image as ImageIcon,
-  LogOut,
-  ChevronRight,
   FolderHeart,
   Coins,
   Sliders,
   Bookmark,
+  LogOut,
+  User,
 } from "lucide-react";
-import { fetchGenerations, deleteGeneration, fetchWallet, isCreativeToolGeneration, type Generation } from "@/lib/supabase/db";
+import { fetchWallet } from "@/lib/supabase/db";
 import { useTheme } from "@/context/ThemeContext";
 
 export default function AppDrawer() {
-  const { isOpen, toggleDrawer, setIsOpen } = useDrawer();
   const { profile, user, signOut } = useUser();
   const { colors } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
-  const [generations, setGenerations] = useState<Generation[]>([]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [walletCredits, setWalletCredits] = useState(100);
-
-  const recentGenerations = generations.filter((g) => !isCreativeToolGeneration(g));
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const userKey = user?.id || profile.email || "default";
 
   useEffect(() => {
-    // Load generation history associated with this user
-    fetchGenerations(userKey).then(setGenerations);
     fetchWallet(userKey).then((w) => setWalletCredits(w.credits));
 
     const handleUpdate = () => {
-      fetchGenerations(userKey).then(setGenerations);
       fetchWallet(userKey).then((w) => setWalletCredits(w.credits));
     };
 
-    window.addEventListener("craftai_generations_updated", handleUpdate);
     window.addEventListener("craftai_wallet_updated", handleUpdate);
     return () => {
-      window.removeEventListener("craftai_generations_updated", handleUpdate);
       window.removeEventListener("craftai_wallet_updated", handleUpdate);
     };
   }, [userKey]);
 
   const navItems = [
     { href: "/explore", label: "Explore Community", icon: LayoutGrid },
-    { href: "/library", label: "Cloud Library", icon: FolderHeart },
+    { href: "/library", label: "Generation History & Library", icon: FolderHeart },
     { href: "/saved", label: "Saved Gallery", icon: Bookmark },
     { href: "/tools", label: "Creative Tools", icon: Sliders },
-    { href: "/wallet", label: "Credits & Wallet", icon: Coins },
+    { href: "/wallet", label: `Credits & Wallet (${walletCredits} Cr)`, icon: Coins },
     { href: "/remix", label: "Remix Lab", icon: Wand2 },
   ];
 
@@ -79,183 +56,115 @@ export default function AppDrawer() {
     return pathname.startsWith(item.href);
   };
 
-  const handleLinkClick = () => {
-    if (isMobile) {
-      setIsOpen(false);
-    }
-  };
-
-  // On mobile, if drawer is closed, don't render or take space
-  if (isMobile && !isOpen) {
-    return null;
-  }
-
   return (
-    <>
-      {/* Mobile Backdrop Overlay */}
-      {isMobile && isOpen && (
-        <div
-          id="drawer-mobile-backdrop"
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.7)",
-            backdropFilter: "blur(4px)",
-            WebkitBackdropFilter: "blur(4px)",
-            zIndex: 89,
-            transition: "opacity 0.2s ease",
-          }}
-        />
-      )}
-
-      <aside
-        style={{
-          width: isMobile ? "min(300px, 85vw)" : (isOpen ? "260px" : "68px"),
-          minWidth: isMobile ? "auto" : (isOpen ? "260px" : "68px"),
-          height: "100vh",
-          background: colors.background,
-          borderRight: `1px solid ${colors.borderLight}`,
-          display: "flex",
-          flexDirection: "column",
-          transition: isMobile ? "none" : "width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
-          zIndex: isMobile ? 90 : 40,
-          position: isMobile ? "fixed" : "sticky",
-          top: 0,
-          left: 0,
-          bottom: isMobile ? 0 : "auto",
-          boxShadow: isMobile ? "0 0 50px rgba(0, 0, 0, 0.85)" : "none",
-          overflow: "hidden",
-          userSelect: "none",
-        }}
-      >
-      {/* ── Top Header of Drawer ───────────────────────────── */}
+    <aside
+      aria-label="Sidebar Navigation"
+      style={{
+        width: "68px",
+        minWidth: "68px",
+        height: "100vh",
+        background: colors.background,
+        borderRight: `1px solid ${colors.borderLight}`,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        zIndex: 40,
+        position: "sticky",
+        top: 0,
+        left: 0,
+        overflow: "hidden",
+        userSelect: "none",
+        boxSizing: "border-box",
+      }}
+    >
+      {/* ── Top Header / Logo ──────────────────────────────── */}
       <div
         style={{
-          padding: isOpen ? "12px 16px" : "12px 0",
+          width: "100%",
+          height: "56px",
           display: "flex",
           alignItems: "center",
-          justifyContent: isOpen ? "space-between" : "center",
-          borderBottom: "1px solid #161d2b",
-          height: "56px",
+          justifyContent: "center",
+          borderBottom: `1px solid ${colors.borderLight}`,
           boxSizing: "border-box",
         }}
       >
         <Link
           href="/"
-          title="CraftAI Studio"
+          title="CraftAI Studio Home"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            justifyContent: "center",
             textDecoration: "none",
-            overflow: "hidden",
           }}
         >
           <div
             style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "8px",
+              width: "36px",
+              height: "36px",
+              borderRadius: "10px",
               background: "linear-gradient(135deg, #00d4ff 0%, #6366f1 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 0 12px rgba(0, 212, 255, 0.3)",
+              boxShadow: "0 0 14px rgba(0, 212, 255, 0.35)",
+              transition: "transform 0.15s ease",
             }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.transform = "scale(1.06)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.transform = "scale(1)")}
           >
-            <Sparkles size={16} color="white" />
+            <Sparkles size={18} color="white" />
           </div>
-          {isOpen && (
-            <span
-              style={{
-                color: "#ffffff",
-                fontSize: "15px",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              CraftAI Studio
-            </span>
-          )}
         </Link>
-
-        {isOpen && (
-          <button
-            id="drawer-toggle-btn"
-            onClick={toggleDrawer}
-            title="Collapse Sidebar"
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "8px",
-              background: "transparent",
-              border: "1px solid #1e2533",
-              color: "#94a3b8",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              flexShrink: 0,
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-              (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
-              (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
-            }}
-          >
-            <PanelLeftClose size={16} />
-          </button>
-        )}
       </div>
 
-      {/* ── New Generation CTA Button ──────────────────────── */}
-      <div style={{ padding: isOpen ? "14px 14px 10px" : "14px 8px 10px" }}>
+      {/* ── New Generation Action Button ────────────────────── */}
+      <div style={{ padding: "14px 0 10px", width: "100%", display: "flex", justifyContent: "center" }}>
         <button
           id="drawer-new-gen-btn"
-          onClick={() => {
-            handleLinkClick();
-            router.push("/");
-          }}
-          title="New Prompt Session"
+          onClick={() => router.push("/studio")}
+          title="New Prompt Session (Studio)"
           style={{
-            width: "100%",
+            width: "42px",
+            height: "42px",
             display: "flex",
             alignItems: "center",
-            justifyContent: isOpen ? "flex-start" : "center",
-            gap: "10px",
-            padding: isOpen ? "10px 14px" : "10px 0",
-            borderRadius: "10px",
+            justifyContent: "center",
+            borderRadius: "12px",
             background: "rgba(0, 212, 255, 0.08)",
-            border: "1px solid rgba(0, 212, 255, 0.25)",
+            border: "1px solid rgba(0, 212, 255, 0.3)",
             color: "#00d4ff",
-            fontSize: "13px",
-            fontWeight: 600,
             cursor: "pointer",
             transition: "all 0.15s",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "rgba(0, 212, 255, 0.16)";
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(0, 212, 255, 0.18)";
             (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
+            (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.05)";
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLButtonElement).style.background = "rgba(0, 212, 255, 0.08)";
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0, 212, 255, 0.25)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0, 212, 255, 0.3)";
+            (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
           }}
         >
-          <Plus size={16} style={{ flexShrink: 0 }} />
-          {isOpen && <span>New Generation</span>}
+          <Plus size={18} />
         </button>
       </div>
 
-      {/* ── Main Navigation Links ──────────────────────────── */}
-      <nav style={{ padding: "0 10px 14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+      {/* ── Main Navigation Icons ──────────────────────────── */}
+      <nav
+        style={{
+          width: "100%",
+          padding: "6px 0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "8px",
+          flex: 1,
+        }}
+      >
         {navItems.map((item) => {
           const active = isActive(item);
           const Icon = item.icon;
@@ -263,305 +172,102 @@ export default function AppDrawer() {
             <Link
               key={item.href}
               href={item.href}
-              onClick={handleLinkClick}
-              id={`drawer-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-              title={!isOpen ? item.label : undefined}
+              id={`drawer-nav-${item.label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+              title={item.label}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                padding: isOpen ? "10px 12px" : "10px 0",
-                justifyContent: isOpen ? "flex-start" : "center",
-                borderRadius: "8px",
+                justifyContent: "center",
+                width: "42px",
+                height: "42px",
+                borderRadius: "10px",
                 textDecoration: "none",
-                background: active ? "rgba(79, 70, 229, 0.18)" : "transparent",
-                border: active ? "1px solid rgba(99, 102, 241, 0.35)" : "1px solid transparent",
-                color: active ? "#ffffff" : "#94a3b8",
-                fontSize: "13px",
-                fontWeight: active ? 600 : 400,
-                transition: "all 0.15s",
+                background: active ? (colors.isDark ? "rgba(99, 102, 241, 0.18)" : "rgba(99, 102, 241, 0.12)") : "transparent",
+                border: active ? `1px solid ${colors.primary}66` : "1px solid transparent",
+                color: active ? colors.primary : colors.textSecondary,
+                transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
                 if (!active) {
-                  (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.04)";
-                  (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+                  (e.currentTarget as HTMLAnchorElement).style.background = colors.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
+                  (e.currentTarget as HTMLAnchorElement).style.color = colors.textPrimary;
                 }
               }}
               onMouseLeave={(e) => {
                 if (!active) {
                   (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-                  (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8";
+                  (e.currentTarget as HTMLAnchorElement).style.color = colors.textSecondary;
                 }
               }}
             >
               <Icon
-                size={17}
+                size={19}
                 style={{
-                  color: active ? "#00d4ff" : "#64748b",
-                  flexShrink: 0,
+                  color: active ? colors.primary : colors.textSecondary,
                 }}
               />
-              {isOpen && (
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {item.label}
-                </span>
-              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* ── Recent Generations Section ─────────────────────── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 10px" }}>
-        {isOpen && (
-          <div
-            style={{
-              padding: "8px 6px 6px",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              color: "#475569",
-              fontSize: "11px",
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            <History size={12} />
-            <span>Recent Generations</span>
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {recentGenerations.length === 0 ? (
-            isOpen ? (
-              <div style={{ padding: "14px 10px", textAlign: "center", color: "#475569", fontSize: "12px", fontStyle: "italic" }}>
-                No recent generations
-              </div>
-            ) : null
-          ) : (
-            recentGenerations.slice(0, 15).map((gen) => (
-              <div
-                key={gen.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  position: "relative",
-                  borderRadius: "6px",
-                  overflow: "hidden",
-                }}
-                onMouseEnter={(e) => {
-                  const btn = e.currentTarget.querySelector(".del-btn") as HTMLElement | null;
-                  if (btn) btn.style.opacity = "1";
-                }}
-                onMouseLeave={(e) => {
-                  const btn = e.currentTarget.querySelector(".del-btn") as HTMLElement | null;
-                  if (btn) btn.style.opacity = "0";
-                }}
-              >
-                <button
-                  onClick={() => {
-                    handleLinkClick();
-                    const imageParam = gen.image_url ? `&imageUrl=${encodeURIComponent(gen.image_url)}` : "";
-                    router.push(`/studio?prompt=${encodeURIComponent(gen.prompt)}&sessionId=${gen.id}${imageParam}`);
-                  }}
-                  title={gen.prompt}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: isOpen ? "8px 10px" : "8px 0",
-                    justifyContent: isOpen ? "flex-start" : "center",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: "#94a3b8",
-                    fontSize: "12px",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#e2e8f0";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "4px",
-                      overflow: "hidden",
-                      flexShrink: 0,
-                      background: "#161d2b",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {gen.image_url ? (
-                      <img
-                        src={gen.image_url}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <ImageIcon size={11} color="#64748b" />
-                    )}
-                  </div>
-                  {isOpen && (
-                    <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        flex: 1,
-                        paddingRight: "24px",
-                      }}
-                    >
-                      {gen.prompt}
-                    </span>
-                  )}
-                </button>
-
-                {isOpen && (
-                  <button
-                    className="del-btn"
-                    title="Remove from history"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      // Optimistic removal: remove immediately from UI
-                      setGenerations((prev) => prev.filter((g) => g.id !== gen.id));
-                      await deleteGeneration(gen.id, userKey);
-                    }}
-                    style={{
-                      position: "absolute",
-                      right: "4px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "rgba(239, 68, 68, 0.15)",
-                      border: "1px solid rgba(239, 68, 68, 0.3)",
-                      borderRadius: "4px",
-                      color: "#f87171",
-                      cursor: "pointer",
-                      padding: "2px 6px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      opacity: 0,
-                      transition: "opacity 0.15s, background 0.15s, color 0.15s",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 2,
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "#ef4444";
-                      (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(239, 68, 68, 0.15)";
-                      (e.currentTarget as HTMLButtonElement).style.color = "#f87171";
-                    }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* ── Bottom Profile Pill ────────────────────────────── */}
+      {/* ── Bottom User Profile Avatar & Menu ───────────────── */}
       <div
         style={{
-          padding: "12px 10px",
-          borderTop: "1px solid #161d2b",
+          width: "100%",
+          padding: "12px 0 16px",
+          borderTop: `1px solid ${colors.borderLight}`,
+          display: "flex",
+          justifyContent: "center",
           position: "relative",
+          boxSizing: "border-box",
         }}
       >
-        <div
-          onClick={() => {
-            handleLinkClick();
-            router.push("/profile");
-          }}
+        <button
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          title={`${profile.name} · ${walletCredits} Credits`}
           style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+            border: userMenuOpen ? "2px solid #00d4ff" : "1px solid rgba(255,255,255,0.15)",
             display: "flex",
             alignItems: "center",
-            gap: "10px",
-            padding: "8px",
-            borderRadius: "10px",
+            justifyContent: "center",
+            fontSize: "12px",
+            fontWeight: 700,
+            color: "white",
             cursor: "pointer",
-            background: "transparent",
             transition: "all 0.15s",
-            justifyContent: isOpen ? "flex-start" : "center",
           }}
-          onMouseEnter={(e) => (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.06)"}
-          onMouseLeave={(e) => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
         >
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "12px",
-              fontWeight: 700,
-              color: "white",
-              flexShrink: 0,
-            }}
-          >
-            {profile.initials}
-          </div>
-          {isOpen && (
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#f1f5f9", whiteSpace: "nowrap" }}>
-                {profile.name}
-              </p>
-              <p style={{ margin: 0, fontSize: "11px", color: "#64748b", whiteSpace: "nowrap" }}>
-                Pro Creator · {walletCredits} Credits
-              </p>
-            </div>
-          )}
-          {isOpen && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setUserMenuOpen(!userMenuOpen);
-              }}
-              style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", padding: "2px" }}
-            >
-              <ChevronRight size={14} />
-            </button>
-          )}
-        </div>
+          {profile.initials}
+        </button>
 
         {/* User Popover Menu */}
         {userMenuOpen && (
           <div
             style={{
-              position: "absolute",
-              bottom: "calc(100% + 8px)",
-              left: "10px",
-              right: "10px",
-              background: "#161d2f",
-              border: "1px solid #2a3b5c",
-              borderRadius: "12px",
-              padding: "6px",
-              boxShadow: "0 12px 36px rgba(0,0,0,0.6)",
-              zIndex: 50,
+              position: "fixed",
+              bottom: "20px",
+              left: "76px",
+              width: "200px",
+              background: colors.surfaceElevated || colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: "14px",
+              padding: "8px",
+              boxShadow: "0 14px 40px rgba(0,0,0,0.45)",
+              zIndex: 99,
             }}
           >
+            <div style={{ padding: "6px 10px 8px", borderBottom: `1px solid ${colors.borderLight}`, marginBottom: "4px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: colors.textPrimary }}>{profile.name}</div>
+              <div style={{ fontSize: "11px", color: colors.primary, fontWeight: 600 }}>{walletCredits} Credits</div>
+            </div>
+
             <Link
               href="/wallet"
               onClick={() => setUserMenuOpen(false)}
@@ -569,38 +275,41 @@ export default function AppDrawer() {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                padding: "8px 12px",
+                padding: "8px 10px",
                 borderRadius: "8px",
-                color: "#00d4ff",
+                color: colors.textSecondary,
                 fontSize: "12px",
-                fontWeight: 600,
+                fontWeight: 500,
                 textDecoration: "none",
               }}
-              onMouseEnter={(e) => (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,212,255,0.08)"}
-              onMouseLeave={(e) => (e.currentTarget as HTMLAnchorElement).style.background = "transparent"}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = colors.isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "transparent")}
             >
-              <Coins size={14} />
-              Wallet ({walletCredits} Cr)
+              <Coins size={14} style={{ color: colors.primary }} />
+              <span>Wallet &amp; Top-up</span>
             </Link>
+
             <Link
-              href="/profile"
+              href="/library"
               onClick={() => setUserMenuOpen(false)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                padding: "8px 12px",
+                padding: "8px 10px",
                 borderRadius: "8px",
-                color: "#f1f5f9",
+                color: colors.textSecondary,
                 fontSize: "12px",
                 fontWeight: 500,
                 textDecoration: "none",
               }}
-              onMouseEnter={(e) => (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.06)"}
-              onMouseLeave={(e) => (e.currentTarget as HTMLAnchorElement).style.background = "transparent"}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = colors.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "transparent")}
             >
-              View Profile
+              <FolderHeart size={14} style={{ color: colors.purpleAccent || "#a5b4fc" }} />
+              <span>Generation History</span>
             </Link>
+
             <button
               onClick={() => {
                 setUserMenuOpen(false);
@@ -611,7 +320,7 @@ export default function AppDrawer() {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                padding: "8px 12px",
+                padding: "8px 10px",
                 borderRadius: "8px",
                 background: "transparent",
                 border: "none",
@@ -620,17 +329,18 @@ export default function AppDrawer() {
                 fontWeight: 500,
                 cursor: "pointer",
                 textAlign: "left",
+                marginTop: "4px",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
               }}
-              onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.1)"}
-              onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.12)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
             >
               <LogOut size={14} />
-              Sign Out
+              <span>Sign Out</span>
             </button>
           </div>
         )}
       </div>
     </aside>
-    </>
   );
 }

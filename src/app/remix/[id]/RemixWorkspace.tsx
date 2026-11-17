@@ -16,6 +16,7 @@ import { saveGeneration } from "@/lib/supabase/db";
 import { generateFreeImage, stripWatermark } from "@/lib/api/generate";
 import { initRemixSession, sendRemixChat, dispatchGeneration } from "@/lib/api/backend-client";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface ChatMsg {
   role: "ai" | "user";
@@ -42,6 +43,7 @@ export default function RemixWorkspace({
   remixedFromPromptId?: string;
   onBack?: () => void;
 }) {
+  const { colors: S } = useTheme();
   const { profile, user } = useUser();
   const userKey = user?.id || profile.email || "default";
 
@@ -245,13 +247,13 @@ export default function RemixWorkspace({
   }
 
   return (
-    <div style={{ height: "100%", width: "100%", background: "#0a0e18", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ height: "100%", width: "100%", background: S.background, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* ── Sub-header Toolbar ──────────────────────────────── */}
       <div
         style={{
           padding: "10px 20px",
-          borderBottom: "1px solid #161d2b",
-          background: "#080c14",
+          borderBottom: `1px solid ${S.borderLight}`,
+          background: S.isDark ? "#080c14" : S.surface,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -269,16 +271,16 @@ export default function RemixWorkspace({
                 gap: "6px",
                 padding: "6px 12px",
                 borderRadius: "8px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid #1e2533",
-                color: "#94a3b8",
+                background: S.surfaceLight,
+                border: `1px solid ${S.borderLight}`,
+                color: S.textSecondary,
                 fontSize: "12px",
                 fontWeight: 500,
                 cursor: "pointer",
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff"}
-              onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533"}
+              onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = S.borderLight}
             >
               <ArrowLeft size={13} />
               <span>Change Reference</span>
@@ -296,7 +298,7 @@ export default function RemixWorkspace({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#94a3b8" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: S.textSecondary }}>
             <Sliders size={13} style={{ color: "#00d4ff" }} />
             <span>Anchor Weight: {Math.round(styleWeight * 100)}%</span>
           </div>
@@ -316,8 +318,8 @@ export default function RemixWorkspace({
       {isMobileOrTablet && (
         <div style={{
           display: "flex",
-          background: "#080c14",
-          borderBottom: "1px solid #161d2b",
+          background: S.isDark ? "#080c14" : S.surface,
+          borderBottom: `1px solid ${S.borderLight}`,
           padding: "8px 12px",
           gap: "8px",
           flexShrink: 0,
@@ -329,9 +331,9 @@ export default function RemixWorkspace({
               flex: 1,
               padding: "8px 12px",
               borderRadius: "8px",
-              background: activeMobileTab === "canvas" ? "rgba(0, 212, 255, 0.12)" : "rgba(255, 255, 255, 0.03)",
-              border: activeMobileTab === "canvas" ? "1px solid rgba(0, 212, 255, 0.4)" : "1px solid #1e293b",
-              color: activeMobileTab === "canvas" ? "#00d4ff" : "#94a3b8",
+              background: activeMobileTab === "canvas" ? "rgba(0, 212, 255, 0.12)" : S.surfaceLight,
+              border: activeMobileTab === "canvas" ? "1px solid rgba(0, 212, 255, 0.4)" : `1px solid ${S.borderLight}`,
+              color: activeMobileTab === "canvas" ? "#00d4ff" : S.textSecondary,
               fontSize: "13px",
               fontWeight: 600,
               display: "flex",
@@ -352,9 +354,9 @@ export default function RemixWorkspace({
               flex: 1,
               padding: "8px 12px",
               borderRadius: "8px",
-              background: activeMobileTab === "assistant" ? "rgba(0, 212, 255, 0.12)" : "rgba(255, 255, 255, 0.03)",
-              border: activeMobileTab === "assistant" ? "1px solid rgba(0, 212, 255, 0.4)" : "1px solid #1e293b",
-              color: activeMobileTab === "assistant" ? "#00d4ff" : "#94a3b8",
+              background: activeMobileTab === "assistant" ? "rgba(0, 212, 255, 0.12)" : S.surfaceLight,
+              border: activeMobileTab === "assistant" ? "1px solid rgba(0, 212, 255, 0.4)" : `1px solid ${S.borderLight}`,
+              color: activeMobileTab === "assistant" ? "#00d4ff" : S.textSecondary,
               fontSize: "13px",
               fontWeight: 600,
               display: "flex",
@@ -391,8 +393,8 @@ export default function RemixWorkspace({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "#070a10",
-            borderRight: isMobileOrTablet ? "none" : "1px solid #161d2b",
+            background: S.isDark ? "#070a10" : S.surfaceLight,
+            borderRight: isMobileOrTablet ? "none" : `1px solid ${S.borderLight}`,
             position: "relative",
             padding: "20px",
             overflow: "hidden",
@@ -432,7 +434,7 @@ export default function RemixWorkspace({
               <p style={{ color: "#00d4ff", fontSize: "15px", fontWeight: 700, margin: "0 0 6px" }}>
                 Synthesizing Image Remix...
               </p>
-              <p style={{ color: "#94a3b8", fontSize: "12px", margin: 0 }}>
+              <p style={{ color: S.textSecondary, fontSize: "12px", margin: 0 }}>
                 Anchor preservation active · High fidelity diffusion
               </p>
             </div>
@@ -445,8 +447,8 @@ export default function RemixWorkspace({
                 maxHeight: "calc(100vh - 170px)",
                 borderRadius: "16px",
                 overflow: "hidden",
-                boxShadow: "0 20px 48px rgba(0,0,0,0.8)",
-                border: "1px solid #1e2533",
+                boxShadow: S.isDark ? "0 20px 48px rgba(0,0,0,0.8)" : "0 20px 48px rgba(0,0,0,0.1)",
+                border: `1px solid ${S.borderLight}`,
               }}
             >
               <img
@@ -557,7 +559,7 @@ export default function RemixWorkspace({
             maxWidth: isMobileOrTablet ? "100%" : "800px",
             display: isMobileOrTablet ? (activeMobileTab === "assistant" ? "flex" : "none") : "flex",
             flexDirection: "column",
-            background: "#0d1117",
+            background: S.surface,
             height: "100%",
             overflow: "hidden",
             userSelect: isResizing ? "none" : "auto",
@@ -568,17 +570,17 @@ export default function RemixWorkspace({
           <div
             style={{
               padding: "14px 18px",
-              borderBottom: "1px solid #161d2b",
+              borderBottom: `1px solid ${S.borderLight}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
             }}
           >
             <div>
-              <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#f1f5f9" }}>
+              <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: S.textPrimary }}>
                 Remix Assistant
               </p>
-              <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>
+              <p style={{ margin: 0, fontSize: "11px", color: S.textMuted }}>
                 Conversational prompt tuning
               </p>
             </div>
@@ -613,16 +615,16 @@ export default function RemixWorkspace({
                     maxWidth: "90%",
                     padding: "9px 13px",
                     borderRadius: msg.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                    background: msg.role === "user" ? "#1e293b" : "rgba(0,212,255,0.05)",
-                    border: msg.role === "user" ? "1px solid #334155" : "1px solid rgba(0,212,255,0.18)",
+                    background: msg.role === "user" ? (S.isDark ? "#1e293b" : S.surfaceLight) : "rgba(0,212,255,0.05)",
+                    border: msg.role === "user" ? `1px solid ${S.borderLight}` : "1px solid rgba(0,212,255,0.18)",
                     fontSize: "12px",
                     lineHeight: "1.5",
-                    color: msg.role === "user" ? "#ffffff" : "#cbd5e1",
+                    color: msg.role === "user" ? S.textPrimary : S.textSecondary,
                   }}
                 >
                   {msg.content}
                 </div>
-                <span style={{ fontSize: "10px", color: "#64748b", padding: "0 4px" }}>
+                <span style={{ fontSize: "10px", color: S.textMuted, padding: "0 4px" }}>
                   {msg.role === "user" ? "You" : "Assistant"} · {msg.time}
                 </span>
               </div>
@@ -630,8 +632,8 @@ export default function RemixWorkspace({
           </div>
 
           {/* Quick Modifier Chips */}
-          <div style={{ padding: "8px 18px", borderTop: "1px solid #161d2b" }}>
-            <p style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
+          <div style={{ padding: "8px 18px", borderTop: `1px solid ${S.borderLight}` }}>
+            <p style={{ fontSize: "10px", fontWeight: 700, color: S.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
               Quick Modifiers
             </p>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -643,9 +645,9 @@ export default function RemixWorkspace({
                   style={{
                     padding: "4px 10px",
                     borderRadius: "6px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid #1e2533",
-                    color: "#94a3b8",
+                    background: S.surfaceLight,
+                    border: `1px solid ${S.borderLight}`,
+                    color: S.textSecondary,
                     fontSize: "11px",
                     fontWeight: 500,
                     cursor: "pointer",
@@ -653,11 +655,11 @@ export default function RemixWorkspace({
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+                    (e.currentTarget as HTMLButtonElement).style.color = S.textPrimary;
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = S.borderLight;
+                    (e.currentTarget as HTMLButtonElement).style.color = S.textSecondary;
                   }}
                 >
                   {mod}
@@ -667,7 +669,7 @@ export default function RemixWorkspace({
           </div>
 
           {/* Prompt & Input Box */}
-          <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #161d2b" }}>
+          <div style={{ padding: "12px 18px 16px", borderTop: `1px solid ${S.borderLight}` }}>
             <textarea
               rows={3}
               value={promptMod}
@@ -681,11 +683,11 @@ export default function RemixWorkspace({
               placeholder="Describe what to change in the reference image..."
               style={{
                 width: "100%",
-                background: "#161d2b",
-                border: "1px solid #222f4c",
+                background: S.surfaceLight,
+                border: `1px solid ${S.borderLight}`,
                 borderRadius: "10px",
                 padding: "10px 12px",
-                color: "#f1f5f9",
+                color: S.textPrimary,
                 fontSize: "13px",
                 lineHeight: "1.5",
                 resize: "none",

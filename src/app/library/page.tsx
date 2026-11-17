@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { fetchGenerations, deleteGeneration, unlockGenerationDownload, fetchWallet, type Generation, type Wallet } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 import { theme } from "@/lib/theme/themeGuard";
 import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
 import { DeleteConfirmationModal } from "@/components/ui/DeleteConfirmationModal";
@@ -51,6 +52,7 @@ function getAspectRatioValue(aspectRatio?: string): string {
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const { profile, user } = useUser();
   const userKey = user?.id || profile.email || "default";
 
@@ -168,12 +170,12 @@ export default function LibraryPage() {
   };
 
   return (
-    <div style={{ minHeight: "100%", background: S.bg, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100%", background: S.background, display: "flex", flexDirection: "column" }}>
       {/* ── Top Header ───────────────────────────────────────── */}
       <div
         style={{
           padding: "18px clamp(14px, 3vw, 28px)",
-          borderBottom: `1px solid ${S.cardBorder}`,
+          borderBottom: `1px solid ${S.borderLight}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -238,7 +240,7 @@ export default function LibraryPage() {
       <div
         style={{
           padding: "12px clamp(14px, 3vw, 28px)",
-          borderBottom: `1px solid ${S.cardBorder}`,
+          borderBottom: `1px solid ${S.borderLight}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -256,7 +258,7 @@ export default function LibraryPage() {
                 padding: "6px 14px",
                 borderRadius: "9999px",
                 border: filterTab === tab ? "none" : `1px solid ${S.borderLight}`,
-                background: filterTab === tab ? S.primary : S.card,
+                background: filterTab === tab ? S.primary : S.surface,
                 color: filterTab === tab ? "#ffffff" : S.textSecondary,
                 fontSize: "12px",
                 fontWeight: filterTab === tab ? 700 : 500,
@@ -342,8 +344,8 @@ export default function LibraryPage() {
                     key={item.id}
                     onClick={() => router.push(`/library/${item.id}`)}
                     style={{
-                      background: S.card,
-                      border: `1px solid ${S.cardBorder}`,
+                      background: S.surface,
+                      border: `1px solid ${S.borderLight}`,
                       borderRadius: "14px",
                       overflow: "hidden",
                       display: "flex",
@@ -356,7 +358,7 @@ export default function LibraryPage() {
                       (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = S.cardBorder;
+                      (e.currentTarget as HTMLDivElement).style.borderColor = S.borderLight;
                       (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
                     }}
                   >
@@ -366,7 +368,7 @@ export default function LibraryPage() {
                         position: "relative",
                         width: "100%",
                         aspectRatio: getAspectRatioValue(item.aspect_ratio),
-                        background: "#08080c",
+                        background: S.isDark ? "#08080c" : S.surfaceLight,
                         overflow: "hidden",
                       }}
                     >
@@ -566,7 +568,7 @@ export default function LibraryPage() {
               </button>
             </div>
 
-            <div style={{ borderRadius: "10px", overflow: "hidden", maxHeight: "160px", background: "#000" }}>
+            <div style={{ borderRadius: "10px", overflow: "hidden", maxHeight: "160px", background: S.isDark ? "#000" : S.surfaceLight }}>
               <img
                 src={paywallModalJob.image_url}
                 alt=""
@@ -585,7 +587,7 @@ export default function LibraryPage() {
                 lineHeight: 1.5,
               }}
             >
-              <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#ffffff" }}>
+              <p style={{ margin: "0 0 6px", fontWeight: 700, color: S.textPrimary }}>
                 ✨ 2 Credits ($0.20) Master Export Fee
               </p>
               Unlock lossless 4K resolution master render. Once unlocked, all future re-downloads of this masterpiece are <strong>100% Free &amp; Idempotent</strong> forever.

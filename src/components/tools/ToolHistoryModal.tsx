@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { X, History, Sparkles, Download, ArrowRight, ExternalLink, Calendar, Zap } from 'lucide-react';
 import type { ToolHistoryItem } from '@/lib/api/toolsApi';
 import Link from 'next/link';
+import { useTheme } from '@/context/ThemeContext';
 
 interface ToolHistoryModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export function ToolHistoryModal({
   onLoadMore,
   hasMore = false,
 }: ToolHistoryModalProps) {
+  const { colors } = useTheme();
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,10 +63,12 @@ export function ToolHistoryModal({
         style={{
           width: 'min(780px, 98%)',
           maxHeight: 'min(86vh, 800px)',
-          background: '#10131d',
-          border: '1px solid #23293f',
+          background: colors.surface,
+          border: `1px solid ${colors.borderLight}`,
           borderRadius: '16px',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.75), 0 0 32px rgba(99, 102, 241, 0.2)',
+          boxShadow: colors.isDark
+            ? '0 24px 64px rgba(0, 0, 0, 0.75), 0 0 32px rgba(99, 102, 241, 0.2)'
+            : '0 24px 64px rgba(15, 23, 42, 0.15), 0 0 32px rgba(99, 102, 241, 0.1)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -73,8 +78,8 @@ export function ToolHistoryModal({
         <div
           style={{
             padding: '18px 24px',
-            borderBottom: '1px solid #1e2436',
-            background: 'linear-gradient(180deg, rgba(26, 32, 54, 0.6) 0%, rgba(16, 19, 29, 0.6) 100%)',
+            borderBottom: `1px solid ${colors.borderLight}`,
+            background: colors.surfaceLight,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -92,7 +97,7 @@ export function ToolHistoryModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#00d4ff',
+                color: colors.copilotAccent,
               }}
             >
               <History size={20} />
@@ -103,7 +108,7 @@ export function ToolHistoryModal({
                 style={{
                   fontSize: '16px',
                   fontWeight: 700,
-                  color: '#ffffff',
+                  color: colors.textPrimary,
                   margin: 0,
                 }}
               >
@@ -112,7 +117,7 @@ export function ToolHistoryModal({
               <p
                 style={{
                   fontSize: '11.5px',
-                  color: '#94a3b8',
+                  color: colors.textSecondary,
                   margin: '2px 0 0 0',
                 }}
               >
@@ -128,9 +133,9 @@ export function ToolHistoryModal({
               width: '32px',
               height: '32px',
               borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid #283048',
-              color: '#94a3b8',
+              background: 'transparent',
+              border: `1px solid ${colors.borderLight}`,
+              color: colors.textSecondary,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -150,17 +155,18 @@ export function ToolHistoryModal({
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
+            background: colors.background,
           }}
         >
           {isLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: colors.textSecondary }}>
               <div
                 style={{
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  border: '3px solid #1e2436',
-                  borderTopColor: '#00d4ff',
+                  border: `3px solid ${colors.borderLight}`,
+                  borderTopColor: colors.primary,
                   animation: 'spin 0.8s linear infinite',
                   margin: '0 auto 12px',
                 }}
@@ -172,17 +178,17 @@ export function ToolHistoryModal({
               style={{
                 textAlign: 'center',
                 padding: '48px 20px',
-                color: '#64748b',
-                background: '#0c0e17',
+                color: colors.textMuted,
+                background: colors.surfaceLight,
                 borderRadius: '12px',
-                border: '1px dashed #1e2436',
+                border: `1px dashed ${colors.borderLight}`,
               }}
             >
               <History size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-              <p style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>
+              <p style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: 600, color: colors.textPrimary }}>
                 No Tool History Found
               </p>
-              <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: '12px', color: colors.textSecondary }}>
                 Execute any creative skill (Remove BG, AI Background, AI Expand, Upscale) to see audit logs here.
               </p>
             </div>
@@ -191,8 +197,8 @@ export function ToolHistoryModal({
               <div
                 key={item.id}
                 style={{
-                  background: '#141824',
-                  border: '1px solid #23293e',
+                  background: colors.surface,
+                  border: `1px solid ${colors.borderLight}`,
                   borderRadius: '12px',
                   padding: '14px 16px',
                   display: 'flex',
@@ -211,8 +217,8 @@ export function ToolHistoryModal({
                       height: '54px',
                       borderRadius: '8px',
                       objectFit: 'cover',
-                      background: '#080c14',
-                      border: '1px solid #283048',
+                      background: colors.surfaceLight,
+                      border: `1px solid ${colors.borderLight}`,
                     }}
                   />
                   <div>
@@ -225,7 +231,7 @@ export function ToolHistoryModal({
                           borderRadius: '4px',
                           background: 'rgba(99, 102, 241, 0.15)',
                           border: '1px solid rgba(99, 102, 241, 0.3)',
-                          color: '#c7d2fe',
+                          color: colors.primary,
                           textTransform: 'uppercase',
                         }}
                       >
@@ -234,14 +240,14 @@ export function ToolHistoryModal({
                       <span
                         style={{
                           fontSize: '11px',
-                          color: item.credits_consumed > 0 ? '#f59e0b' : '#10b981',
+                          color: item.credits_consumed > 0 ? colors.accentWarning : colors.accentSuccess,
                           fontWeight: 600,
                         }}
                       >
                         {item.credits_consumed > 0 ? `${item.credits_consumed} Cr` : 'Free (0 Cr)'}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: colors.textMuted }}>
                       <Calendar size={11} />
                       <span>{new Date(item.created_at).toLocaleString()}</span>
                       {item.latency_ms ? <span>· {item.latency_ms}ms</span> : null}
@@ -258,9 +264,9 @@ export function ToolHistoryModal({
                     style={{
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid #283048',
-                      color: '#e2e8f0',
+                      background: colors.surfaceLight,
+                      border: `1px solid ${colors.borderLight}`,
+                      color: colors.textPrimary,
                       fontSize: '11.5px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -276,7 +282,7 @@ export function ToolHistoryModal({
                       borderRadius: '6px',
                       background: 'rgba(99, 102, 241, 0.2)',
                       border: '1px solid rgba(99, 102, 241, 0.4)',
-                      color: '#c7d2fe',
+                      color: colors.primary,
                       fontSize: '11.5px',
                       fontWeight: 700,
                       textDecoration: 'none',
@@ -297,9 +303,9 @@ export function ToolHistoryModal({
                     style={{
                       padding: '6px 10px',
                       borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid #283048',
-                      color: '#94a3b8',
+                      background: colors.surfaceLight,
+                      border: `1px solid ${colors.borderLight}`,
+                      color: colors.textSecondary,
                       display: 'flex',
                       alignItems: 'center',
                     }}
@@ -321,7 +327,7 @@ export function ToolHistoryModal({
                   borderRadius: '8px',
                   background: 'rgba(99, 102, 241, 0.15)',
                   border: '1px solid rgba(99, 102, 241, 0.35)',
-                  color: '#c7d2fe',
+                  color: colors.primary,
                   fontSize: '12px',
                   fontWeight: 600,
                   cursor: isLoading ? 'not-allowed' : 'pointer',
@@ -338,14 +344,14 @@ export function ToolHistoryModal({
         <div
           style={{
             padding: '14px 24px',
-            borderTop: '1px solid #1e2436',
-            background: '#0d101a',
+            borderTop: `1px solid ${colors.borderLight}`,
+            background: colors.surfaceLight,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <span style={{ fontSize: '11px', color: '#64748b' }}>
+          <span style={{ fontSize: '11px', color: colors.textMuted }}>
             FastAPI v1.4.0 Dual-Parity Audit Ledger
           </span>
           <button
@@ -353,7 +359,7 @@ export function ToolHistoryModal({
             style={{
               padding: '7px 18px',
               borderRadius: '8px',
-              background: '#6366f1',
+              background: colors.primary,
               border: 'none',
               color: '#ffffff',
               fontSize: '12px',

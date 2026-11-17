@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toolsApi, BaseToolResponse } from '@/lib/api/toolsApi';
 import { theme } from '@/lib/theme/themeGuard';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Point {
   x: number;
@@ -40,7 +41,7 @@ export function MagicObjectEraser({
   onSavedToLibrary,
   onImageChange,
 }: MagicObjectEraserProps) {
-  const S = theme.colors;
+  const { colors: S } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [imageUrl, setImageUrl] = useState<string>(initialImageUrl || '');

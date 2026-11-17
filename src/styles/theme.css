@@ -1,0 +1,72 @@
+/* ============================================================
+   CRAFTAI STUDIO — DESIGN SYSTEM TOKENS & COLOR THEME CSS
+   Source of Truth: Mobile Application (lib/core/theme/app_theme.dart)
+   ============================================================ */
+
+:root {
+  /* Brand Accents */
+  --brand-primary: #6366F1;
+  --brand-secondary: #8B5CF6;
+  --brand-vip: #A855F7;
+  --accent-cyan: #06B6D4;
+  --accent-success: #10B981;
+  --accent-warning: #F59E0B;
+  --accent-error: #EF4444;
+
+  /* AI Gradients */
+  --grad-ai-cosmic: linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #06B6D4 100%);
+  --grad-glass-specular: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(99, 102, 241, 0.1) 100%);
+
+  /* Light Theme (Luminous Aurora Default) */
+  --bg-canvas: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-surface-muted: #F1F5F9;
+  --border-default: #E2E8F0;
+  --border-subtle: #EEF2F6;
+  --glass-surface: rgba(255, 255, 255, 0.73);
+  --glass-border: rgba(99, 102, 241, 0.20);
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-tertiary: #94A3B8;
+}
+
+[data-theme="dark"],
+.dark,
+[data-theme="obsidian"],
+[data-theme="defaultDark"],
+[data-theme="cyberpunk"] {
+  /* Dark Theme: Deep Obsidian */
+  --bg-canvas: #0B0D14;
+  --bg-surface: #161B26;
+  --bg-surface-elevated: #121622;
+  --bg-surface-muted: #1F2636;
+  --border-default: #283245;
+  --border-subtle: #1C2230;
+  --glass-surface: rgba(22, 27, 38, 0.80);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --grad-glass-specular: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-tertiary: #475569;
+}
+
+[data-theme="light"],
+[data-theme="aurora"] {
+  /* Explicit Light Theme: Luminous Aurora */
+  --bg-canvas: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-surface-muted: #F1F5F9;
+  --border-default: #E2E8F0;
+  --border-subtle: #EEF2F6;
+  --glass-surface: rgba(255, 255, 255, 0.73);
+  --glass-border: rgba(99, 102, 241, 0.20);
+  --grad-glass-specular: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(99, 102, 241, 0.1) 100%);
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-tertiary: #94A3B8;
+}

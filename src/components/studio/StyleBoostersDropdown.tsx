@@ -3,8 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Zap, X } from "lucide-react";
 import { theme } from "@/lib/theme/themeGuard";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 export const STYLE_BOOSTERS = [
   { label: "Cinematic Lighting", icon: "✨", modifier: "cinematic dramatic lighting, volumetric rim light" },
@@ -30,6 +29,7 @@ export default function StyleBoostersDropdown({
   onClearBoosters,
   disabled = false,
 }: Props) {
+  const { colors: S } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -63,9 +63,9 @@ export default function StyleBoostersDropdown({
           gap: "6px",
           padding: "6px 12px",
           borderRadius: "9999px",
-          background: activeCount > 0 ? "rgba(234, 179, 8, 0.12)" : "rgba(255, 255, 255, 0.05)",
-          border: activeCount > 0 ? "1px solid rgba(234, 179, 8, 0.4)" : "1px solid #1e2533",
-          color: activeCount > 0 ? "#facc15" : "#cbd5e1",
+          background: activeCount > 0 ? "rgba(234, 179, 8, 0.12)" : S.surface,
+          border: activeCount > 0 ? "1px solid rgba(234, 179, 8, 0.4)" : `1px solid ${S.borderLight}`,
+          color: activeCount > 0 ? "#facc15" : S.textSecondary,
           fontSize: "12px",
           fontWeight: 600,
           cursor: disabled ? "not-allowed" : "pointer",
@@ -81,11 +81,11 @@ export default function StyleBoostersDropdown({
         onMouseLeave={(e) => {
           if (!disabled) {
             (e.currentTarget as HTMLButtonElement).style.borderColor =
-              activeCount > 0 ? "rgba(234, 179, 8, 0.4)" : "#1e2533";
+              activeCount > 0 ? "rgba(234, 179, 8, 0.4)" : S.borderLight;
           }
         }}
       >
-        <Zap size={13} style={{ color: activeCount > 0 ? "#facc15" : "#94a3b8" }} />
+        <Zap size={13} style={{ color: activeCount > 0 ? "#facc15" : S.textMuted }} />
         <span>Boosters{activeCount > 0 ? ` (${activeCount})` : ""}</span>
         <ChevronDown
           size={13}
@@ -103,12 +103,14 @@ export default function StyleBoostersDropdown({
             position: "absolute",
             bottom: "calc(100% + 8px)",
             left: 0,
-            background: "#121722",
-            border: "1px solid #222f4c",
+            background: S.surfaceElevated || S.surface,
+            border: `1px solid ${S.borderLight}`,
             borderRadius: "14px",
             padding: "8px",
             zIndex: 1000,
-            boxShadow: "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(234, 179, 8, 0.15)",
+            boxShadow: S.isDark
+              ? "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(234, 179, 8, 0.15)"
+              : "0 16px 40px rgba(15, 23, 42, 0.15)",
             minWidth: "250px",
             backdropFilter: "blur(12px)",
           }}
@@ -119,11 +121,11 @@ export default function StyleBoostersDropdown({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "4px 8px 8px",
-              borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+              borderBottom: `1px solid ${S.borderLight}`,
               marginBottom: "6px",
             }}
           >
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: S.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               Style Boosters {activeCount > 0 && `(${activeCount} Active)`}
             </span>
             {activeCount > 0 && onClearBoosters && (
@@ -133,7 +135,7 @@ export default function StyleBoostersDropdown({
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#ef4444",
+                  color: S.accentError,
                   fontSize: "11px",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -168,13 +170,13 @@ export default function StyleBoostersDropdown({
                     border: isApplied ? "1px solid rgba(234, 179, 8, 0.3)" : "1px solid transparent",
                     cursor: "pointer",
                     textAlign: "left",
-                    color: isApplied ? "#fef08a" : "#cbd5e1",
+                    color: isApplied ? (S.isDark ? "#fef08a" : "#b45309") : S.textPrimary,
                     transition: "all 0.15s",
                     width: "100%",
                   }}
                   onMouseEnter={(e) => {
                     if (!isApplied) {
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                      (e.currentTarget as HTMLButtonElement).style.background = S.surfaceLight;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -195,7 +197,7 @@ export default function StyleBoostersDropdown({
                       width: "16px",
                       height: "16px",
                       borderRadius: "4px",
-                      border: isApplied ? "1px solid #facc15" : "1px solid #475569",
+                      border: isApplied ? "1px solid #facc15" : `1px solid ${S.borderLight}`,
                       background: isApplied ? "#facc15" : "transparent",
                       display: "flex",
                       alignItems: "center",

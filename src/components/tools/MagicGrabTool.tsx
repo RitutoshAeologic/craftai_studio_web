@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toolsApi, MagicGrabResponse } from '@/lib/api/toolsApi';
 import { theme } from '@/lib/theme/themeGuard';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Point {
   x: number;
@@ -44,7 +45,7 @@ export function MagicGrabTool({
   onSavedToLibrary,
   onImageChange,
 }: MagicGrabToolProps) {
-  const S = theme.colors;
+  const { colors: S } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [imageUrl, setImageUrl] = useState<string>(initialImageUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600');

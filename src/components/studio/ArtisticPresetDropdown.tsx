@@ -4,8 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Sparkles } from "lucide-react";
 import { ARTISTIC_PRESETS, type ArtisticPreset } from "./ArtisticStylePresetBar";
 import { theme } from "@/lib/theme/themeGuard";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 interface Props {
   selectedPresetId: string;
@@ -18,6 +17,7 @@ export default function ArtisticPresetDropdown({
   onSelectPreset,
   disabled = false,
 }: Props) {
+  const { colors: S } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,9 +53,9 @@ export default function ArtisticPresetDropdown({
           gap: "6px",
           padding: "6px 12px",
           borderRadius: "9999px",
-          background: selectedPresetId !== "none" ? "rgba(0, 212, 255, 0.12)" : "rgba(255, 255, 255, 0.05)",
-          border: selectedPresetId !== "none" ? "1px solid rgba(0, 212, 255, 0.35)" : "1px solid #1e2533",
-          color: selectedPresetId !== "none" ? S.cyan : "#cbd5e1",
+          background: selectedPresetId !== "none" ? (S.isDark ? "rgba(0, 212, 255, 0.12)" : "rgba(6, 182, 212, 0.12)") : S.surface,
+          border: selectedPresetId !== "none" ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
+          color: selectedPresetId !== "none" ? S.cyan : S.textSecondary,
           fontSize: "12px",
           fontWeight: 600,
           cursor: disabled ? "not-allowed" : "pointer",
@@ -71,11 +71,11 @@ export default function ArtisticPresetDropdown({
         onMouseLeave={(e) => {
           if (!disabled) {
             (e.currentTarget as HTMLButtonElement).style.borderColor =
-              selectedPresetId !== "none" ? "rgba(0, 212, 255, 0.35)" : "#1e2533";
+              selectedPresetId !== "none" ? S.cyan : S.borderLight;
           }
         }}
       >
-        <Sparkles size={13} style={{ color: selectedPresetId !== "none" ? S.cyan : "#94a3b8" }} />
+        <Sparkles size={13} style={{ color: selectedPresetId !== "none" ? S.cyan : S.textMuted }} />
         <span>{activePreset.name}</span>
         <ChevronDown size={13} style={{ color: S.textSecondary, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }} />
       </button>
@@ -86,17 +86,19 @@ export default function ArtisticPresetDropdown({
             position: "absolute",
             bottom: "calc(100% + 8px)",
             left: 0,
-            background: "#121722",
-            border: "1px solid #222f4c",
+            background: S.surfaceElevated || S.surface,
+            border: `1px solid ${S.borderLight}`,
             borderRadius: "14px",
             padding: "6px",
             zIndex: 1000,
-            boxShadow: "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 212, 255, 0.1)",
+            boxShadow: S.isDark
+              ? "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 212, 255, 0.1)"
+              : "0 16px 40px rgba(15, 23, 42, 0.15)",
             minWidth: "230px",
             backdropFilter: "blur(12px)",
           }}
         >
-          <div style={{ padding: "6px 8px 4px", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <div style={{ padding: "6px 8px 4px", fontSize: "11px", fontWeight: 700, color: S.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Artistic Style Presets
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -118,17 +120,17 @@ export default function ArtisticPresetDropdown({
                     justifyContent: "space-between",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    background: isSelected ? "rgba(0, 212, 255, 0.12)" : "transparent",
+                    background: isSelected ? (S.isDark ? "rgba(0, 212, 255, 0.15)" : "rgba(99, 102, 241, 0.12)") : "transparent",
                     border: "none",
                     cursor: "pointer",
                     textAlign: "left",
-                    color: isSelected ? "#ffffff" : "#cbd5e1",
+                    color: isSelected ? S.primary : S.textPrimary,
                     transition: "all 0.15s",
                     width: "100%",
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected) {
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                      (e.currentTarget as HTMLButtonElement).style.background = S.surfaceLight;
                     }
                   }}
                   onMouseLeave={(e) => {

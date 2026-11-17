@@ -22,8 +22,10 @@ import {
 } from "lucide-react";
 import { fetchGenerations, fetchArtworks, deleteGeneration, type Generation, type Artwork } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function ProfilePage() {
+  const { colors: S } = useTheme();
   const router = useRouter();
   const { profile, user, updateProfile, signOut } = useUser();
   const userKey = user?.id || profile.email || "default";
@@ -63,13 +65,13 @@ export default function ProfilePage() {
   };
 
   return (
-    <div style={{ minHeight: "100%", background: "#0a0e18", paddingBottom: "60px" }}>
+    <div style={{ minHeight: "100%", background: S.background, paddingBottom: "60px" }}>
       {/* ── Top Cover Banner ────────────────────────────────── */}
       <div
         style={{
           height: "200px",
           width: "100%",
-          background: "linear-gradient(135deg, #0b1329 0%, #1e1b4b 50%, #082f49 100%)",
+          background: S.isDark ? "linear-gradient(135deg, #0b1329 0%, #1e1b4b 50%, #082f49 100%)" : "linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #e0f2fe 100%)",
           position: "relative",
           overflow: "hidden",
         }}
@@ -78,7 +80,7 @@ export default function ProfilePage() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: "radial-gradient(circle at 30% 50%, rgba(0, 212, 255, 0.15), transparent 60%)",
+            backgroundImage: S.isDark ? "radial-gradient(circle at 30% 50%, rgba(0, 212, 255, 0.15), transparent 60%)" : "radial-gradient(circle at 30% 50%, rgba(99, 102, 241, 0.15), transparent 60%)",
           }}
         />
       </div>
@@ -104,7 +106,7 @@ export default function ProfilePage() {
                 height: "clamp(75px, 14vw, 110px)",
                 borderRadius: "50%",
                 background: "linear-gradient(135deg, #6366f1 0%, #00d4ff 100%)",
-                border: "4px solid #0a0e18",
+                border: `4px solid ${S.background}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -120,7 +122,7 @@ export default function ProfilePage() {
 
             <div style={{ paddingBottom: "6px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
-                <h1 style={{ fontSize: "clamp(20px, 4vw, 24px)", fontWeight: 800, color: "#ffffff", margin: 0, letterSpacing: "-0.02em" }}>
+                <h1 style={{ fontSize: "clamp(20px, 4vw, 24px)", fontWeight: 800, color: S.textPrimary, margin: 0, letterSpacing: "-0.02em" }}>
                   {profile.name}
                 </h1>
                 <span
@@ -137,10 +139,10 @@ export default function ProfilePage() {
                   PRO CREATOR
                 </span>
               </div>
-              <p style={{ fontSize: "13px", color: "#94a3b8", margin: "0 0 6px" }}>
+              <p style={{ fontSize: "13px", color: S.textSecondary, margin: "0 0 6px" }}>
                 {profile.handle} · AI Prompt Crafting &amp; Concept Design
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "12px", color: "#64748b" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "12px", color: S.textMuted }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   <Clock size={13} /> Joined Jan 2024
                 </span>
@@ -162,9 +164,9 @@ export default function ProfilePage() {
                 gap: "6px",
                 padding: "9px 16px",
                 borderRadius: "10px",
-                background: "#161d2b",
-                border: "1px solid #1e293b",
-                color: "#e2e8f0",
+                background: S.surface,
+                border: `1px solid ${S.borderLight}`,
+                color: S.textPrimary,
                 fontSize: "13px",
                 fontWeight: 600,
                 cursor: "pointer",
@@ -230,17 +232,17 @@ export default function ProfilePage() {
             marginBottom: "32px",
           }}
         >
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: "12px", padding: "16px" }}>
-            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#94a3b8", fontWeight: 500 }}>
+          <div style={{ background: S.surface, border: `1px solid ${S.borderLight}`, borderRadius: "12px", padding: "16px" }}>
+            <p style={{ margin: "0 0 6px", fontSize: "12px", color: S.textSecondary, fontWeight: 500 }}>
               Generations Run
             </p>
-            <p style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#ffffff" }}>
+            <p style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: S.textPrimary }}>
               {generations.length + 120}
             </p>
           </div>
 
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: "12px", padding: "16px" }}>
-            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#94a3b8", fontWeight: 500 }}>
+          <div style={{ background: S.surface, border: `1px solid ${S.borderLight}`, borderRadius: "12px", padding: "16px" }}>
+            <p style={{ margin: "0 0 6px", fontSize: "12px", color: S.textSecondary, fontWeight: 500 }}>
               Total Remixes
             </p>
             <p style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#a5b4fc" }}>
@@ -248,8 +250,8 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: "12px", padding: "16px" }}>
-            <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#94a3b8", fontWeight: 500 }}>
+          <div style={{ background: S.surface, border: `1px solid ${S.borderLight}`, borderRadius: "12px", padding: "16px" }}>
+            <p style={{ margin: "0 0 6px", fontSize: "12px", color: S.textSecondary, fontWeight: 500 }}>
               Community Likes
             </p>
             <p style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#f43f5e" }}>
@@ -257,12 +259,12 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          <div style={{ background: "#111827", border: "1px solid rgba(0, 212, 255, 0.25)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: S.surface, border: "1px solid rgba(0, 212, 255, 0.25)", borderRadius: "12px", padding: "16px" }}>
             <p style={{ margin: "0 0 6px", fontSize: "12px", color: "#00d4ff", fontWeight: 600 }}>
               Available Credits
             </p>
             <p style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#00d4ff" }}>
-              98 <span style={{ fontSize: "12px", fontWeight: 500, color: "#94a3b8" }}>/ 100 Free</span>
+              98 <span style={{ fontSize: "12px", fontWeight: 500, color: S.textMuted }}>/ 100 Free</span>
             </p>
           </div>
         </div>
@@ -272,7 +274,7 @@ export default function ProfilePage() {
           style={{
             display: "flex",
             gap: "8px",
-            borderBottom: "1px solid #1e293b",
+            borderBottom: `1px solid ${S.borderLight}`,
             marginBottom: "24px",
             overflowX: "auto",
             scrollbarWidth: "none",
@@ -285,7 +287,7 @@ export default function ProfilePage() {
               background: "transparent",
               border: "none",
               borderBottom: activeTab === "creations" ? "2px solid #00d4ff" : "2px solid transparent",
-              color: activeTab === "creations" ? "#00d4ff" : "#94a3b8",
+              color: activeTab === "creations" ? "#00d4ff" : S.textSecondary,
               fontSize: "14px",
               fontWeight: activeTab === "creations" ? 700 : 500,
               cursor: "pointer",
@@ -302,7 +304,7 @@ export default function ProfilePage() {
               background: "transparent",
               border: "none",
               borderBottom: activeTab === "favorites" ? "2px solid #00d4ff" : "2px solid transparent",
-              color: activeTab === "favorites" ? "#00d4ff" : "#94a3b8",
+              color: activeTab === "favorites" ? "#00d4ff" : S.textSecondary,
               fontSize: "14px",
               fontWeight: activeTab === "favorites" ? 700 : 500,
               cursor: "pointer",
@@ -319,7 +321,7 @@ export default function ProfilePage() {
               background: "transparent",
               border: "none",
               borderBottom: activeTab === "settings" ? "2px solid #00d4ff" : "2px solid transparent",
-              color: activeTab === "settings" ? "#00d4ff" : "#94a3b8",
+              color: activeTab === "settings" ? "#00d4ff" : S.textSecondary,
               fontSize: "14px",
               fontWeight: activeTab === "settings" ? 700 : 500,
               cursor: "pointer",
@@ -366,14 +368,14 @@ export default function ProfilePage() {
                   <div
                     key={gen.id}
                     style={{
-                      background: "#111827",
-                      border: "1px solid #1e293b",
+                      background: S.surface,
+                      border: `1px solid ${S.borderLight}`,
                       borderRadius: "14px",
                       overflow: "hidden",
                       transition: "all 0.15s",
                     }}
                   >
-                    <div style={{ height: "200px", width: "100%", background: "#0b0f19", position: "relative" }}>
+                    <div style={{ height: "200px", width: "100%", background: S.isDark ? "#0b0f19" : S.surfaceLight, position: "relative" }}>
                       <img
                         src={gen.image_url || "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600&auto=format&fit=crop"}
                         alt={gen.prompt}
@@ -409,7 +411,7 @@ export default function ProfilePage() {
                       <p
                         style={{
                           fontSize: "12px",
-                          color: "#f1f5f9",
+                          color: S.textPrimary,
                           margin: "0 0 12px",
                           lineHeight: "1.4",
                           overflow: "hidden",
@@ -477,13 +479,13 @@ export default function ProfilePage() {
               <div
                 key={item.id}
                 style={{
-                  background: "#111827",
-                  border: "1px solid #1e293b",
+                  background: S.surface,
+                  border: `1px solid ${S.borderLight}`,
                   borderRadius: "14px",
                   overflow: "hidden",
                 }}
               >
-                <div style={{ height: "200px", width: "100%", background: "#0b0f19" }}>
+                <div style={{ height: "200px", width: "100%", background: S.isDark ? "#0b0f19" : S.surfaceLight }}>
                   <img
                     src={item.image_url || item.fallback_url}
                     alt={item.title}
@@ -491,10 +493,10 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div style={{ padding: "14px" }}>
-                  <h4 style={{ margin: "0 0 4px", fontSize: "14px", color: "#ffffff", fontWeight: 700 }}>
+                  <h4 style={{ margin: "0 0 4px", fontSize: "14px", color: S.textPrimary, fontWeight: 700 }}>
                     {item.title}
                   </h4>
-                  <p style={{ margin: "0 0 12px", fontSize: "11px", color: "#64748b" }}>
+                  <p style={{ margin: "0 0 12px", fontSize: "11px", color: S.textMuted }}>
                     by {item.author_name} · {item.category}
                   </p>
                   <button
@@ -524,19 +526,19 @@ export default function ProfilePage() {
           <div
             style={{
               maxWidth: "600px",
-              background: "#111827",
-              border: "1px solid #1e293b",
+              background: S.surface,
+              border: `1px solid ${S.borderLight}`,
               borderRadius: "16px",
               padding: "24px",
             }}
           >
-            <h3 style={{ margin: "0 0 18px", fontSize: "16px", fontWeight: 700, color: "#ffffff" }}>
+            <h3 style={{ margin: "0 0 18px", fontSize: "16px", fontWeight: 700, color: S.textPrimary }}>
               Creator Profile &amp; Preferences
             </h3>
 
             {/* Display Name Input */}
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#cbd5e1", marginBottom: "8px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: S.textSecondary, marginBottom: "8px" }}>
                 Creator Display Name
               </label>
               <input
@@ -548,9 +550,9 @@ export default function ProfilePage() {
                   width: "100%",
                   padding: "10px 12px",
                   borderRadius: "8px",
-                  background: "#161d2b",
-                  border: "1px solid #222f4c",
-                  color: "#f1f5f9",
+                  background: S.surfaceLight,
+                  border: `1px solid ${S.borderLight}`,
+                  color: S.textPrimary,
                   fontSize: "13px",
                   outline: "none",
                   boxSizing: "border-box",
@@ -560,7 +562,7 @@ export default function ProfilePage() {
 
             {/* Preferred Model */}
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#cbd5e1", marginBottom: "8px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: S.textSecondary, marginBottom: "8px" }}>
                 Default AI Model Engine
               </label>
               <select
@@ -570,9 +572,9 @@ export default function ProfilePage() {
                   width: "100%",
                   padding: "10px 12px",
                   borderRadius: "8px",
-                  background: "#161d2b",
-                  border: "1px solid #222f4c",
-                  color: "#f1f5f9",
+                  background: S.surfaceLight,
+                  border: `1px solid ${S.borderLight}`,
+                  color: S.textPrimary,
                   fontSize: "13px",
                   outline: "none",
                 }}
@@ -585,7 +587,7 @@ export default function ProfilePage() {
 
             {/* Default Aspect Ratio */}
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#cbd5e1", marginBottom: "8px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: S.textSecondary, marginBottom: "8px" }}>
                 Default Aspect Ratio
               </label>
               <div style={{ display: "flex", gap: "10px" }}>
@@ -598,9 +600,9 @@ export default function ProfilePage() {
                       flex: 1,
                       padding: "8px",
                       borderRadius: "8px",
-                      border: defaultRatio === r ? "1px solid #00d4ff" : "1px solid #1e293b",
-                      background: defaultRatio === r ? "rgba(0, 212, 255, 0.1)" : "#161d2b",
-                      color: defaultRatio === r ? "#00d4ff" : "#94a3b8",
+                      border: defaultRatio === r ? "1px solid #00d4ff" : `1px solid ${S.borderLight}`,
+                      background: defaultRatio === r ? "rgba(0, 212, 255, 0.1)" : S.surfaceLight,
+                      color: defaultRatio === r ? "#00d4ff" : S.textSecondary,
                       fontSize: "13px",
                       fontWeight: 600,
                       cursor: "pointer",
@@ -619,16 +621,16 @@ export default function ProfilePage() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "14px 0",
-                borderTop: "1px solid #1e293b",
-                borderBottom: "1px solid #1e293b",
+                borderTop: `1px solid ${S.borderLight}`,
+                borderBottom: `1px solid ${S.borderLight}`,
                 marginBottom: "24px",
               }}
             >
               <div>
-                <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 600, color: "#f1f5f9" }}>
+                <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 600, color: S.textPrimary }}>
                   Safe Mode Active
                 </p>
-                <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: S.textMuted }}>
                   Automatically filters sensitive content from outputs
                 </p>
               </div>
@@ -639,7 +641,7 @@ export default function ProfilePage() {
                   width: "44px",
                   height: "24px",
                   borderRadius: "12px",
-                  background: safeMode ? "#00d4ff" : "#1e293b",
+                  background: safeMode ? "#00d4ff" : (S.isDark ? "#1e293b" : "#cbd5e1"),
                   border: "none",
                   cursor: "pointer",
                   position: "relative",
@@ -689,14 +691,14 @@ export default function ProfilePage() {
               style={{
                 marginTop: "24px",
                 paddingTop: "20px",
-                borderTop: "1px solid #1e293b",
+                borderTop: `1px solid ${S.borderLight}`,
               }}
             >
               <h4 style={{ margin: "0 0 6px", fontSize: "14px", fontWeight: 700, color: "#f87171" }}>
                 Account &amp; Session
               </h4>
-              <p style={{ margin: "0 0 14px", fontSize: "12px", color: "#64748b" }}>
-                Signed in as <span style={{ color: "#cbd5e1" }}>{user?.email || profile.email}</span>
+              <p style={{ margin: "0 0 14px", fontSize: "12px", color: S.textMuted }}>
+                Signed in as <span style={{ color: S.textPrimary }}>{user?.email || profile.email}</span>
               </p>
               <button
                 type="button"

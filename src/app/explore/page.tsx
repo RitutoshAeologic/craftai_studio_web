@@ -16,6 +16,7 @@ import {
 import { theme } from "@/lib/theme/themeGuard";
 import { ExploreFilterBar } from "@/components/explore/ExploreFilterBar";
 import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
+import { useTheme } from "@/context/ThemeContext";
 
 /* ── Design tokens linked directly to Central Theme Guard ────── */
 const S = theme.colors;
@@ -62,6 +63,7 @@ function CardDetailModal({
   onZoom?: (item: Artwork) => void;
 }) {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const royaltyPercent = item.remix_fee && item.creator_royalty_cut
     ? Math.round((item.creator_royalty_cut / item.remix_fee) * 100)
     : 40;
@@ -148,7 +150,7 @@ function CardDetailModal({
               position: "relative",
               borderRadius: "14px",
               overflow: "hidden",
-              background: "#08080c",
+              background: S.isDark ? "#08080c" : S.surfaceLight,
               border: `1px solid ${S.borderLight}`,
               display: "flex",
               alignItems: "center",
@@ -496,6 +498,7 @@ function GalleryCard({
   onZoom?: (item: Artwork) => void;
 }) {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const explorePollinationsKey = process.env.NEXT_PUBLIC_POLLINATIONS_API_KEY || "";
@@ -521,7 +524,7 @@ function GalleryCard({
         position: "relative",
         cursor: "pointer",
         height: displayH,
-        background: "#08080c",
+        background: S.isDark ? "#08080c" : S.surfaceLight,
         border: hovered ? `1.5px solid ${S.cyan}` : `1.5px solid ${S.cardBorder}`,
         transition: "border-color 0.2s, transform 0.2s, box-shadow 0.2s",
         transform: hovered ? "translateY(-3px)" : "translateY(0)",
@@ -534,7 +537,7 @@ function GalleryCard({
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(90deg, #121218 25%, #1e1e2a 50%, #121218 75%)",
+            background: S.isDark ? "linear-gradient(90deg, #121218 25%, #1e1e2a 50%, #121218 75%)" : "linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)",
             backgroundSize: "200% 100%",
             animation: "shimmer 1.5s infinite",
             display: "flex",
@@ -578,7 +581,7 @@ function GalleryCard({
         }}
       />
 
-      {/* Category Pill Top-Left (Clickable to Category Screen) */}
+      {/* Category Pill Top-Left (Clickable to Category Screen, Hover-Only Reveal) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -599,21 +602,24 @@ function GalleryCard({
           border: "1px solid rgba(0,212,255,0.3)",
           cursor: "pointer",
           zIndex: 3,
-          transition: "transform 0.15s, border-color 0.15s",
+          opacity: hovered ? 1 : 0,
+          transform: hovered ? "translateY(0)" : "translateY(-4px)",
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.2s ease, transform 0.2s ease, border-color 0.15s",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)";
           (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+          (e.currentTarget as HTMLButtonElement).style.transform = hovered ? "translateY(0)" : "translateY(-4px)";
           (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0,212,255,0.3)";
         }}
       >
         {item.category}
       </button>
 
-      {/* Top-Right Action Controls (Bookmark & Like) */}
+      {/* Top-Right Action Controls (Magnifier Zoom, Bookmark & Like - Hover-Only Reveal) */}
       <div
         style={{
           position: "absolute",
@@ -623,6 +629,10 @@ function GalleryCard({
           alignItems: "center",
           gap: "6px",
           zIndex: 3,
+          opacity: hovered ? 1 : 0,
+          transform: hovered ? "translateY(0)" : "translateY(-4px)",
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.2s ease, transform 0.2s ease",
         }}
       >
         {/* Quick Lightbox Zoom Button */}
@@ -792,6 +802,7 @@ function GalleryCard({
 ═══════════════════════════════════════════════════════════════ */
 export default function ExplorePage() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const [items, setItems] = useState<Artwork[]>([]);
   const [category, setCategory] = useState("All");
   const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(CANONICAL_CATEGORIES);
@@ -928,12 +939,12 @@ export default function ExplorePage() {
   }, [filtered, colCount]);
 
   return (
-    <div style={{ minHeight: "100%", background: S.bg, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100%", background: S.background, display: "flex", flexDirection: "column" }}>
       {/* ── Top Filter Bar ───────────────────────────────────── */}
       <div
         style={{
-          borderBottom: `1px solid ${S.cardBorder}`,
-          background: S.bg,
+          borderBottom: `1px solid ${S.borderLight}`,
+          background: S.background,
           padding: "14px clamp(12px, 3vw, 24px)",
           display: "flex",
           flexDirection: "column",

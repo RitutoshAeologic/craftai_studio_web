@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap");
 @import "tailwindcss";
+@import "../styles/theme.css";
 
 /* ============================================================
    CRAFTAI STUDIO — GLOBAL DESIGN SYSTEM
@@ -129,8 +130,8 @@ body {
 }
 
 .glass-input {
-  background: rgba(11, 15, 25, 0.8);
-  border: 1px solid var(--surface-border);
+  background: var(--bg-surface-muted, rgba(11, 15, 25, 0.8));
+  border: 1px solid var(--border-default, var(--surface-border));
   border-radius: 10px;
   color: var(--text-primary);
   font-family: var(--font-body);

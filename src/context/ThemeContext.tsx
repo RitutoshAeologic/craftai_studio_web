@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   colors: THEME_PRESETS.defaultDark,
   preset: 'defaultDark',
   setPreset: () => {},
-  availablePresets: ['defaultDark', 'cyberpunk', 'obsidian'],
+  availablePresets: ['obsidian', 'aurora', 'defaultDark', 'cyberpunk'],
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -46,7 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         colors,
         preset,
         setPreset: handleSetPreset,
-        availablePresets: ['defaultDark', 'cyberpunk', 'obsidian'],
+        availablePresets: ['obsidian', 'aurora', 'defaultDark', 'cyberpunk'],
       }}
     >
       {children}
@@ -61,7 +61,7 @@ export function useTheme() {
       colors: theme.colors,
       preset: theme.preset,
       setPreset: theme.setPreset,
-      availablePresets: ['defaultDark', 'cyberpunk', 'obsidian'] as ThemePresetName[],
+      availablePresets: ['obsidian', 'aurora', 'defaultDark', 'cyberpunk'] as ThemePresetName[],
     };
   }
   return context;

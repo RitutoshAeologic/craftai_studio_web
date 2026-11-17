@@ -24,6 +24,7 @@ import {
   type Artwork,
 } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
+import { useTheme } from "@/context/ThemeContext";
 
 const S = theme.colors;
 
@@ -39,8 +40,220 @@ const ALL_CATEGORIES = [
 
 const SORT_OPTIONS = ["Trending Now", "Newest First", "Most Liked", "Most Remixed"];
 
+/* ═══════════════════════════════════════════════════════════════
+   CATEGORY ARTWORK CARD (Hover-Reveal Overlay Controls)
+═══════════════════════════════════════════════════════════════ */
+function CategoryArtworkCard({
+  item,
+  isLiked,
+  isBookmarked,
+  onLikeToggle,
+  onBookmarkToggle,
+  router,
+}: {
+  item: Artwork;
+  isLiked: boolean;
+  isBookmarked: boolean;
+  onLikeToggle: (id: string) => void;
+  onBookmarkToggle: (item: Artwork) => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const { colors: S } = useTheme();
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      onClick={() => router.push(`/explore/${item.id}`)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative",
+        borderRadius: "16px",
+        overflow: "hidden",
+        background: S.surface,
+        border: `1px solid ${hovered ? S.cyan : S.borderLight}`,
+        cursor: "pointer",
+        aspectRatio: "1 / 1",
+        transform: hovered ? "translateY(-4px)" : "translateY(0)",
+        boxShadow: hovered ? (S.isDark ? "0 16px 36px rgba(0, 0, 0, 0.6)" : "0 16px 36px rgba(15, 23, 42, 0.12)") : "none",
+        transition: "transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+      }}
+    >
+      <img
+        src={item.image_url}
+        alt={item.title || "Category creation"}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+          transform: hovered ? "scale(1.04)" : "scale(1)",
+          transition: "transform 0.3s ease",
+        }}
+      />
+
+      {/* Category Pill Top-Left (Hover-Only Reveal) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/explore/category/${encodeURIComponent(item.category.toLowerCase())}`);
+        }}
+        style={{
+          position: "absolute",
+          top: "10px",
+          left: "10px",
+          padding: "4px 10px",
+          borderRadius: "6px",
+          background: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(6px)",
+          fontSize: "11px",
+          fontWeight: 700,
+          color: S.cyan,
+          border: "1px solid rgba(0, 212, 255, 0.35)",
+          cursor: "pointer",
+          zIndex: 3,
+          opacity: hovered ? 1 : 0,
+          transform: hovered ? "translateY(0)" : "translateY(-4px)",
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.2s ease, transform 0.2s ease, border-color 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0, 212, 255, 0.35)";
+        }}
+      >
+        {item.category}
+      </button>
+
+      {/* Top-Right Action Controls (Bookmark & Like - Hover-Only Reveal) */}
+      <div
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          zIndex: 3,
+          opacity: hovered ? 1 : 0,
+          transform: hovered ? "translateY(0)" : "translateY(-4px)",
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.2s ease, transform 0.2s ease",
+        }}
+      >
+        {/* Bookmark Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onBookmarkToggle(item);
+          }}
+          title={isBookmarked ? "Remove from Saved Gallery" : "Save to Saved Gallery"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "30px",
+            height: "30px",
+            borderRadius: "7px",
+            background: isBookmarked ? "rgba(0, 212, 255, 0.28)" : "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(6px)",
+            border: isBookmarked ? "1.5px solid #00d4ff" : "1px solid rgba(255,255,255,0.18)",
+            cursor: "pointer",
+            color: isBookmarked ? "#00d4ff" : "#cbd5e1",
+            boxShadow: isBookmarked ? "0 0 14px rgba(0, 212, 255, 0.55)" : "none",
+            transition: "all 0.15s",
+          }}
+        >
+          <Bookmark
+            size={14}
+            style={{
+              fill: isBookmarked ? "#00d4ff" : "none",
+              stroke: isBookmarked ? "#00d4ff" : "currentColor",
+            }}
+          />
+        </button>
+
+        {/* Like Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onLikeToggle(item.id);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            padding: "4px 9px",
+            height: "30px",
+            borderRadius: "7px",
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(6px)",
+            border: isLiked ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(255, 255, 255, 0.1)",
+            cursor: "pointer",
+            color: isLiked ? "#ef4444" : "#cbd5e1",
+            fontSize: "11px",
+            fontWeight: 600,
+          }}
+        >
+          <Heart size={12} style={{ fill: isLiked ? "#ef4444" : "none" }} />
+          <span>{(item.likes_count || 100) + (isLiked ? 1 : 0)}</span>
+        </button>
+      </div>
+
+      {/* Bottom Overlay Info (Hover-Only Reveal) */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "12px 14px",
+          background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          opacity: hovered ? 1 : 0,
+          transform: hovered ? "translateY(0)" : "translateY(6px)",
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.25s ease, transform 0.25s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{
+              width: "24px",
+              height: "24px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "10px",
+              fontWeight: 700,
+              color: "white",
+            }}
+          >
+            {item.author_avatar || "CA"}
+          </div>
+          <span style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 600 }}>
+            @{item.author_handle}
+          </span>
+        </div>
+
+        <span style={{ fontSize: "11px", color: S.cyan, fontWeight: 600 }}>
+          ⚡ {item.remix_count || 24}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryExplorePage() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const params = useParams();
   const rawCategory = (params?.category as string) || "all";
   const activeCategory = decodeURIComponent(rawCategory).toLowerCase();
@@ -150,7 +363,7 @@ export default function CategoryExplorePage() {
             display: "inline-flex",
             alignItems: "center",
             gap: "6px",
-            background: "rgba(255, 255, 255, 0.05)",
+            background: S.surfaceLight,
             border: `1px solid ${S.borderLight}`,
             padding: "6px 12px",
             borderRadius: "8px",
@@ -163,7 +376,7 @@ export default function CategoryExplorePage() {
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
-            (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+            (e.currentTarget as HTMLButtonElement).style.color = S.cyan;
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLButtonElement).style.borderColor = S.borderLight;
@@ -189,7 +402,7 @@ export default function CategoryExplorePage() {
               style={{
                 fontSize: "clamp(24px, 4vw, 36px)",
                 fontWeight: 800,
-                color: "#ffffff",
+                color: S.textPrimary,
                 letterSpacing: "-0.02em",
                 margin: 0,
                 fontFamily: "var(--font-outfit, Outfit, sans-serif)",
@@ -208,7 +421,7 @@ export default function CategoryExplorePage() {
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              background: "#12141f",
+              background: S.surfaceLight,
               border: `1px solid ${S.borderLight}`,
               borderRadius: "10px",
               padding: "8px 14px",
@@ -225,7 +438,7 @@ export default function CategoryExplorePage() {
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: "#f1f5f9",
+                color: S.textPrimary,
                 fontSize: "13px",
                 width: "100%",
               }}
@@ -255,7 +468,7 @@ export default function CategoryExplorePage() {
               padding: "6px 14px",
               borderRadius: "9999px",
               border: `1px solid ${S.borderLight}`,
-              background: "rgba(255, 255, 255, 0.03)",
+              background: S.surface,
               color: S.textSecondary,
               fontSize: "12.5px",
               fontWeight: 500,
@@ -279,9 +492,9 @@ export default function CategoryExplorePage() {
                   style={{
                     padding: "6px 14px",
                     borderRadius: "9999px",
-                    border: isCurrent ? `1px solid ${S.cyan}` : `1px solid ${S.borderLight}`,
-                    background: isCurrent ? "rgba(0, 212, 255, 0.15)" : "rgba(255, 255, 255, 0.03)",
-                    color: isCurrent ? S.cyan : S.textSecondary,
+                    border: isCurrent ? `1px solid ${S.primary}` : `1px solid ${S.borderLight}`,
+                    background: isCurrent ? (S.isDark ? "rgba(99, 102, 241, 0.22)" : "rgba(99, 102, 241, 0.12)") : S.surface,
+                    color: isCurrent ? S.primary : S.textSecondary,
                     fontSize: "12.5px",
                     fontWeight: isCurrent ? 700 : 500,
                     cursor: "pointer",
@@ -305,7 +518,7 @@ export default function CategoryExplorePage() {
               gap: "8px",
               padding: "7px 14px",
               borderRadius: "8px",
-              background: "rgba(255, 255, 255, 0.05)",
+              background: S.surface,
               border: `1px solid ${S.borderLight}`,
               color: S.textPrimary,
               fontSize: "12.5px",
@@ -324,13 +537,13 @@ export default function CategoryExplorePage() {
                 position: "absolute",
                 top: "calc(100% + 6px)",
                 right: 0,
-                background: S.panel,
+                background: S.surfaceElevated || S.surface,
                 border: `1px solid ${S.borderLight}`,
                 borderRadius: "10px",
                 padding: "6px",
                 zIndex: 100,
                 minWidth: "160px",
-                boxShadow: "0 12px 32px rgba(0,0,0,0.8)",
+                boxShadow: S.isDark ? "0 12px 32px rgba(0,0,0,0.8)" : "0 12px 32px rgba(15, 23, 42, 0.15)",
               }}
             >
               {SORT_OPTIONS.map((opt) => (
@@ -344,9 +557,9 @@ export default function CategoryExplorePage() {
                     width: "100%",
                     padding: "7px 12px",
                     borderRadius: "6px",
-                    background: sortBy === opt ? "rgba(0, 212, 255, 0.15)" : "transparent",
+                    background: sortBy === opt ? (S.isDark ? "rgba(0, 212, 255, 0.15)" : "rgba(99, 102, 241, 0.1)") : "transparent",
                     border: "none",
-                    color: sortBy === opt ? S.cyan : S.textPrimary,
+                    color: sortBy === opt ? S.primary : S.textPrimary,
                     fontSize: "12px",
                     fontWeight: sortBy === opt ? 700 : 400,
                     textAlign: "left",
@@ -372,7 +585,7 @@ export default function CategoryExplorePage() {
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: S.textSecondary }}>
           <Sparkles size={36} style={{ color: S.cyan, marginBottom: "12px", opacity: 0.7 }} />
-          <h3 style={{ color: "#ffffff", fontSize: "18px", margin: "0 0 6px" }}>No artworks found</h3>
+          <h3 style={{ color: S.textPrimary, fontSize: "18px", margin: "0 0 6px" }}>No artworks found</h3>
           <p style={{ fontSize: "13px", maxWidth: "420px", margin: "0 auto 20px" }}>
             There are no creations matching &quot;{searchQuery || displayCategoryTitle}&quot; yet. Be the first to generate one in Studio!
           </p>
@@ -400,186 +613,17 @@ export default function CategoryExplorePage() {
             gap: "20px",
           }}
         >
-          {filtered.map((item) => {
-            const isLiked = !!likedMap[item.id];
-            return (
-              <div
-                key={item.id}
-                onClick={() => router.push(`/explore/${item.id}`)}
-                style={{
-                  position: "relative",
-                  borderRadius: "16px",
-                  overflow: "hidden",
-                  background: "#101018",
-                  border: `1px solid ${S.borderLight}`,
-                  cursor: "pointer",
-                  aspectRatio: "1 / 1",
-                  transition: "transform 0.2s, border-color 0.2s, box-shadow 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform = "translateY(-4px)";
-                  el.style.borderColor = S.cyan;
-                  el.style.boxShadow = "0 16px 36px rgba(0, 0, 0, 0.6)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform = "translateY(0)";
-                  el.style.borderColor = S.borderLight;
-                  el.style.boxShadow = "none";
-                }}
-              >
-                <img
-                  src={item.image_url}
-                  alt={item.title || "Category creation"}
-                  onContextMenu={(e) => e.preventDefault()}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
-                />
-
-                {/* Category Pill Top-Left (stops propagation) */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push(`/explore/category/${encodeURIComponent(item.category.toLowerCase())}`);
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "10px",
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                    background: "rgba(0, 0, 0, 0.75)",
-                    backdropFilter: "blur(6px)",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: S.cyan,
-                    border: "1px solid rgba(0, 212, 255, 0.35)",
-                    cursor: "pointer",
-                    zIndex: 2,
-                  }}
-                >
-                  {item.category}
-                </button>
-
-                {/* Top-Right Action Controls (Bookmark & Like) */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    right: "10px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    zIndex: 3,
-                  }}
-                >
-                  {/* Bookmark Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBookmarkToggle(item);
-                    }}
-                    title={bookmarkedMap[item.id] ? "Remove from Saved Gallery" : "Save to Saved Gallery"}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "30px",
-                      height: "30px",
-                      borderRadius: "7px",
-                      background: bookmarkedMap[item.id] ? "rgba(0, 212, 255, 0.28)" : "rgba(0,0,0,0.75)",
-                      backdropFilter: "blur(6px)",
-                      border: bookmarkedMap[item.id] ? "1.5px solid #00d4ff" : "1px solid rgba(255,255,255,0.18)",
-                      cursor: "pointer",
-                      color: bookmarkedMap[item.id] ? "#00d4ff" : "#cbd5e1",
-                      boxShadow: bookmarkedMap[item.id] ? "0 0 14px rgba(0, 212, 255, 0.55)" : "none",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    <Bookmark
-                      size={14}
-                      style={{
-                        fill: bookmarkedMap[item.id] ? "#00d4ff" : "none",
-                        stroke: bookmarkedMap[item.id] ? "#00d4ff" : "currentColor",
-                      }}
-                    />
-                  </button>
-
-                  {/* Like Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLikeToggle(item.id);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "5px",
-                      padding: "4px 9px",
-                      height: "30px",
-                      borderRadius: "7px",
-                      background: "rgba(0, 0, 0, 0.75)",
-                      backdropFilter: "blur(6px)",
-                      border: isLiked ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(255, 255, 255, 0.1)",
-                      cursor: "pointer",
-                      color: isLiked ? "#ef4444" : "#cbd5e1",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    <Heart size={12} style={{ fill: isLiked ? "#ef4444" : "none" }} />
-                    <span>{(item.likes_count || 100) + (isLiked ? 1 : 0)}</span>
-                  </button>
-                </div>
-
-                {/* Bottom Overlay Info */}
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: "12px 14px",
-                    background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div
-                      style={{
-                        width: "24px",
-                        height: "24px",
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        color: "white",
-                      }}
-                    >
-                      {item.author_avatar || "CA"}
-                    </div>
-                    <span style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 600 }}>
-                      @{item.author_handle}
-                    </span>
-                  </div>
-
-                  <span style={{ fontSize: "11px", color: S.cyan, fontWeight: 600 }}>
-                    ⚡ {item.remix_count || 24}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          {filtered.map((item) => (
+            <CategoryArtworkCard
+              key={item.id}
+              item={item}
+              isLiked={!!likedMap[item.id]}
+              isBookmarked={!!bookmarkedMap[item.id]}
+              onLikeToggle={handleLikeToggle}
+              onBookmarkToggle={handleBookmarkToggle}
+              router={router}
+            />
+          ))}
         </div>
       )}
     </div>

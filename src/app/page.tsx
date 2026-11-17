@@ -20,6 +20,7 @@ import ArtisticPresetDropdown from "@/components/studio/ArtisticPresetDropdown";
 import AspectRatioDropdown from "@/components/studio/AspectRatioDropdown";
 import StyleBoostersDropdown, { STYLE_BOOSTERS } from "@/components/studio/StyleBoostersDropdown";
 import { type AspectRatio } from "@/lib/api/generate";
+import { useTheme } from "@/context/ThemeContext";
 
 const QUICK_PROMPTS = [
   {
@@ -54,6 +55,7 @@ const ENGINES = [
 
 export default function HomePage() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [prompt, setPrompt] = useState("");
   const [engine, setEngine] = useState(ENGINES[0]);
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
@@ -146,7 +148,7 @@ export default function HomePage() {
           style={{
             fontSize: "clamp(22px, 4.5vw, 36px)",
             fontWeight: 700,
-            color: "#ffffff",
+            color: colors.textPrimary,
             letterSpacing: "-0.02em",
             marginBottom: "clamp(20px, 3vw, 24px)",
             fontFamily: "var(--font-outfit, Outfit, sans-serif)",
@@ -159,11 +161,13 @@ export default function HomePage() {
         <div
           style={{
             width: "100%",
-            background: "#161d2b",
-            border: "1px solid #222f4c",
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
             borderRadius: "20px",
             padding: "12px 14px 10px",
-            boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.08)",
+            boxShadow: colors.isDark
+              ? "0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.08)"
+              : "0 12px 32px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.12)",
             transition: "border-color 0.2s, box-shadow 0.2s",
             display: "flex",
             flexDirection: "column",
@@ -190,7 +194,7 @@ export default function HomePage() {
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: submitting ? "#64748b" : "#f1f5f9",
+                color: submitting ? colors.textMuted : colors.textPrimary,
                 fontSize: "14px",
                 lineHeight: "1.5",
                 resize: "none",
@@ -223,24 +227,24 @@ export default function HomePage() {
                   gap: "6px",
                   padding: "6px 12px",
                   borderRadius: "9999px",
-                  background: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid #1e2533",
-                  color: "#cbd5e1",
+                  background: colors.surfaceLight,
+                  border: `1px solid ${colors.borderLight}`,
+                  color: colors.textSecondary,
                   fontSize: "12px",
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.15s",
                   whiteSpace: "nowrap",
                 }}
-                onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff"}
-                onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533"}
+                onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = colors.primary}
+                onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.borderColor = colors.borderLight}
               >
-                <Cpu size={13} style={{ color: "#00d4ff" }} />
+                <Cpu size={13} style={{ color: colors.copilotAccent || colors.primary }} />
                 <span>{engine.label}</span>
                 <ChevronDown
                   size={13}
                   style={{
-                    color: "#94a3b8",
+                    color: colors.textMuted,
                     transition: "transform 0.2s",
                     transform: engineMenuOpen ? "rotate(180deg)" : "none",
                   }}
@@ -253,12 +257,12 @@ export default function HomePage() {
                     position: "absolute",
                     bottom: "calc(100% + 8px)",
                     left: 0,
-                    background: "#161d2b",
-                    border: "1px solid #222f4c",
+                    background: colors.surfaceElevated || colors.surface,
+                    border: `1px solid ${colors.border}`,
                     borderRadius: "12px",
                     overflow: "hidden",
                     zIndex: 100,
-                    boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+                    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
                     minWidth: "150px",
                   }}
                 >
@@ -274,8 +278,8 @@ export default function HomePage() {
                         width: "100%",
                         textAlign: "left",
                         padding: "8px 14px",
-                        background: engine.id === e.id ? "rgba(0, 212, 255, 0.1)" : "transparent",
-                        color: engine.id === e.id ? "#00d4ff" : "#cbd5e1",
+                        background: engine.id === e.id ? `${colors.primary}22` : "transparent",
+                        color: engine.id === e.id ? colors.primary : colors.textPrimary,
                         border: "none",
                         fontSize: "13px",
                         cursor: "pointer",
@@ -386,15 +390,15 @@ export default function HomePage() {
                 width: "34px",
                 height: "34px",
                 borderRadius: "50%",
-                background: prompt.trim() && !submitting ? "#00d4ff" : "#1e2533",
+                background: prompt.trim() && !submitting ? colors.primary : colors.surfaceLight,
                 border: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: prompt.trim() && !submitting ? "pointer" : "not-allowed",
-                color: prompt.trim() && !submitting ? "#000000" : "#64748b",
+                color: prompt.trim() && !submitting ? "#ffffff" : colors.textMuted,
                 transition: "all 0.15s",
-                boxShadow: prompt.trim() && !submitting ? "0 0 16px rgba(0, 212, 255, 0.4)" : "none",
+                boxShadow: prompt.trim() && !submitting ? `0 0 16px ${colors.primaryGlow || "rgba(99, 102, 241, 0.4)"}` : "none",
                 flexShrink: 0,
               }}
             >
@@ -429,22 +433,22 @@ export default function HomePage() {
                   gap: "12px",
                   padding: "12px 16px",
                   borderRadius: "14px",
-                  background: "#111827",
-                  border: "1px solid #1e2533",
-                  color: "#cbd5e1",
+                  background: colors.surface,
+                  border: `1px solid ${colors.borderLight}`,
+                  color: colors.textSecondary,
                   fontSize: "13px",
                   textAlign: "left",
                   cursor: "pointer",
                   transition: "all 0.15s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-                  (e.currentTarget as HTMLButtonElement).style.background = "#161d2b";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = colors.primary;
+                  (e.currentTarget as HTMLButtonElement).style.background = colors.surfaceHover;
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
-                  (e.currentTarget as HTMLButtonElement).style.background = "#111827";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = colors.borderLight;
+                  (e.currentTarget as HTMLButtonElement).style.background = colors.surface;
                   (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                 }}
               >

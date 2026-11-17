@@ -5,8 +5,7 @@ import { ChevronDown, Check, Crop } from "lucide-react";
 import { type AspectRatio } from "@/lib/api/generate";
 import { ASPECT_OPTIONS, type AspectRatioOption } from "./AspectRatioFrameSelector";
 import { theme } from "@/lib/theme/themeGuard";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 interface Props {
   selectedRatioId: AspectRatio;
@@ -19,6 +18,7 @@ export default function AspectRatioDropdown({
   onSelectRatio,
   disabled = false,
 }: Props) {
+  const { colors: S } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,9 +53,9 @@ export default function AspectRatioDropdown({
           gap: "6px",
           padding: "6px 12px",
           borderRadius: "9999px",
-          background: "rgba(255, 255, 255, 0.05)",
-          border: "1px solid #1e2533",
-          color: "#cbd5e1",
+          background: S.surface,
+          border: `1px solid ${S.borderLight}`,
+          color: S.textSecondary,
           fontSize: "12px",
           fontWeight: 600,
           cursor: disabled ? "not-allowed" : "pointer",
@@ -70,7 +70,7 @@ export default function AspectRatioDropdown({
         }}
         onMouseLeave={(e) => {
           if (!disabled) {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = S.borderLight;
           }
         }}
       >
@@ -111,17 +111,19 @@ export default function AspectRatioDropdown({
             position: "absolute",
             bottom: "calc(100% + 8px)",
             left: 0,
-            background: "#121722",
-            border: "1px solid #222f4c",
+            background: S.surfaceElevated || S.surface,
+            border: `1px solid ${S.borderLight}`,
             borderRadius: "14px",
             padding: "6px",
             zIndex: 1000,
-            boxShadow: "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 212, 255, 0.1)",
+            boxShadow: S.isDark
+              ? "0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 212, 255, 0.1)"
+              : "0 16px 40px rgba(15, 23, 42, 0.15)",
             minWidth: "220px",
             backdropFilter: "blur(12px)",
           }}
         >
-          <div style={{ padding: "6px 8px 4px", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <div style={{ padding: "6px 8px 4px", fontSize: "11px", fontWeight: 700, color: S.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Aspect Ratio & Frame
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -142,17 +144,17 @@ export default function AspectRatioDropdown({
                     justifyContent: "space-between",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    background: isSelected ? "rgba(0, 212, 255, 0.12)" : "transparent",
+                    background: isSelected ? (S.isDark ? "rgba(0, 212, 255, 0.12)" : "rgba(99, 102, 241, 0.12)") : "transparent",
                     border: "none",
                     cursor: "pointer",
                     textAlign: "left",
-                    color: isSelected ? "#ffffff" : "#cbd5e1",
+                    color: isSelected ? S.primary : S.textPrimary,
                     transition: "all 0.15s",
                     width: "100%",
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected) {
-                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.05)";
+                      (e.currentTarget as HTMLButtonElement).style.background = S.surfaceLight;
                     }
                   }}
                   onMouseLeave={(e) => {

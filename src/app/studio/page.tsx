@@ -30,6 +30,7 @@ import { useGeneration } from "@/context/GenerationContext";
 import { saveGeneration, publishArtwork, savePrivateArtwork, fetchWallet } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
 import { useLLMConfig } from "@/context/LLMConfigContext";
+import { useTheme } from "@/context/ThemeContext";
 import { theme } from "@/lib/theme/themeGuard";
 import { safeUUID } from "@/lib/utils/uuid";
 
@@ -100,6 +101,7 @@ interface StudioChatMessage {
 
 function StudioContent() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const { profile, user } = useUser();
   // ── Multi-LLM Config from Supabase (via backend ConfigService) ──────────
   const { llmConfig, isLoadingConfig } = useLLMConfig();
@@ -934,7 +936,7 @@ function StudioContent() {
   };
 
   return (
-    <div style={{ height: "100%", width: "100%", background: S.bg, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ height: "100%", width: "100%", background: S.background, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* ── Mobile/Tablet View Switcher ────────────────────── */}
       {isMobileOrTablet && (
         <div style={{
@@ -997,7 +999,7 @@ function StudioContent() {
       {remixedFromPromptId.current && (
         <div
           style={{
-            background: "#0d0d14",
+            background: S.surfaceLight,
             borderBottom: `1px solid ${S.panelBorder}`,
             padding: "8px 16px",
             display: "flex",
@@ -1033,7 +1035,7 @@ function StudioContent() {
           display: isMobileOrTablet ? (activeMobileTab === "canvas" ? "flex" : "none") : "flex",
           flexDirection: "column",
           borderRight: isMobileOrTablet ? "none" : `1px solid ${S.panelBorder}`,
-          background: S.bg,
+          background: S.background,
           minWidth: 0,
           overflow: "hidden",
         }}>
@@ -1042,7 +1044,7 @@ function StudioContent() {
           <div style={{
             padding: "8px 16px",
             borderBottom: `1px solid ${S.panelBorder}`,
-            background: "#080c14",
+            background: S.surfaceLight,
             display: "flex",
             alignItems: "center",
             gap: "12px",
@@ -1217,7 +1219,7 @@ function StudioContent() {
           {/* Canvas with Live Progress Card & Image Display */}
           <div style={{
             flex: 1,
-            background: "#080c14",
+            background: S.isDark ? "#080c14" : S.surfaceLight,
             position: "relative",
             display: "flex",
             alignItems: "center",
@@ -1230,7 +1232,7 @@ function StudioContent() {
               <div
                 style={{
                   width: "min(520px, 92%)",
-                  background: "rgba(18, 18, 24, 0.95)",
+                  background: S.isDark ? "rgba(18, 18, 24, 0.95)" : S.surface,
                   border: `1px solid ${S.primary}`,
                   borderRadius: "16px",
                   padding: "24px",
@@ -1248,7 +1250,7 @@ function StudioContent() {
                 </div>
 
                 {/* Percentage Counter */}
-                <div style={{ fontSize: "36px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
+                <div style={{ fontSize: "36px", fontWeight: 800, color: S.textPrimary, marginBottom: "8px" }}>
                   {progressPercent}%
                 </div>
 
@@ -1331,7 +1333,7 @@ function StudioContent() {
                 boxShadow: "0 24px 60px rgba(0,0,0,0.85)",
                 border: `1px solid ${S.cardBorder}`,
                 transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
-                background: "#080c14",
+                background: S.isDark ? "#080c14" : S.surfaceLight,
               }}
             >
               <img
@@ -1600,11 +1602,11 @@ function StudioContent() {
                   maxWidth: "92%",
                   padding: "9px 13px",
                   borderRadius: msg.role === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                  background: msg.role === "user" ? "#1e293b" : "rgba(0, 212, 255, 0.05)",
-                  border: msg.role === "user" ? "1px solid #334155" : "1px solid rgba(0, 212, 255, 0.2)",
+                  background: msg.role === "user" ? (S.isDark ? "#1e293b" : S.surfaceLight) : (S.isDark ? "rgba(0, 212, 255, 0.05)" : "rgba(99, 102, 241, 0.06)"),
+                  border: msg.role === "user" ? `1px solid ${S.borderLight}` : "1px solid rgba(0, 212, 255, 0.2)",
                   fontSize: "12px",
                   lineHeight: "1.5",
-                  color: msg.role === "user" ? "#ffffff" : "#cbd5e1",
+                  color: S.textPrimary,
                 }}>
                   {msg.content}
 
@@ -1786,7 +1788,7 @@ function StudioContent() {
                 placeholder={isBusy ? "Synthesis in progress..." : "Type instructions or concept (press Enter to send to Copilot)..."}
                 style={{
                   width: "100%",
-                  background: isBusy ? "#0a0e18" : S.card,
+                  background: isBusy ? (S.isDark ? "#0a0e18" : S.surfaceLight) : S.card,
                   border: `1px solid ${isBusy ? S.cardBorder : S.cardBorder}`,
                   borderRadius: "8px",
                   padding: "8px 10px",
@@ -1869,8 +1871,8 @@ function StudioContent() {
                     marginTop: "6px",
                     padding: "7px 10px",
                     borderRadius: "8px",
-                    background: "#0c0e17",
-                    border: "1px solid #1a2030",
+                    background: S.surfaceLight,
+                    border: `1px solid ${S.borderLight}`,
                     display: "flex",
                     flexDirection: "column",
                     gap: "5px",
@@ -2047,7 +2049,7 @@ function StudioContent() {
             </div>
 
             {/* Dynamic Credit Generate Button (Task Lockdown Protected) */}
-            <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${S.panelBorder}`, background: "#0a0e18" }}>
+            <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${S.panelBorder}`, background: S.panel }}>
               <button
                 id="studio-generate-btn"
                 onClick={handleGenerate}

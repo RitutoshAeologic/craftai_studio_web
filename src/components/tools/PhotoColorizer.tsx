@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toolsApi, BaseToolResponse } from '@/lib/api/toolsApi';
 import { theme } from '@/lib/theme/themeGuard';
+import { useTheme } from '@/context/ThemeContext';
 
 interface PhotoColorizerProps {
   initialImageUrl?: string;
@@ -34,7 +35,7 @@ export function PhotoColorizer({
   onSavedToLibrary,
   onImageChange,
 }: PhotoColorizerProps) {
-  const S = theme.colors;
+  const { colors: S } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [imageUrl, setImageUrl] = useState<string>(initialImageUrl || '');

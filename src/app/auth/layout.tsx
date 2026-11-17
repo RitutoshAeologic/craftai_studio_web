@@ -4,7 +4,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-grid"
-      style={{ background: "#0b0f19" }}
+      style={{ background: "var(--bg-canvas, #0b0f19)" }}
     >
       {/* Ambient glow orbs */}
       <div

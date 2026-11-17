@@ -22,11 +22,11 @@ import { fetchArtworkById, fetchArtworks, savePrivateArtwork, removePrivateArtwo
 import { theme } from "@/lib/theme/themeGuard";
 import { BACKEND_URL, fetchSimilarCreations } from "@/lib/api/backend-client";
 import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 export default function ExploreDetailPage() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const params = useParams();
   const artworkId = params?.id as string;
 
@@ -140,7 +140,7 @@ export default function ExploreDetailPage() {
   if (!artwork) {
     return (
       <div style={{ flex: 1, padding: "40px 24px", maxWidth: "800px", margin: "0 auto", textAlign: "center" }}>
-        <h2 style={{ color: "#fff", fontSize: "22px", marginBottom: "8px" }}>Generation Not Found</h2>
+        <h2 style={{ color: S.textPrimary, fontSize: "22px", marginBottom: "8px" }}>Generation Not Found</h2>
         <p style={{ color: S.textSecondary, fontSize: "14px", marginBottom: "20px" }}>
           The requested artwork could not be located in the explore gallery.
         </p>
@@ -186,7 +186,7 @@ export default function ExploreDetailPage() {
           marginBottom: "24px",
           gap: "12px",
           flexWrap: "wrap",
-          background: "rgba(11, 11, 15, 0.9)",
+          background: S.isDark ? "rgba(11, 13, 20, 0.9)" : "rgba(255, 255, 255, 0.92)",
           backdropFilter: "blur(14px)",
           borderBottom: `1px solid ${S.borderLight}`,
           borderRadius: "0 0 16px 16px",
@@ -199,7 +199,7 @@ export default function ExploreDetailPage() {
               display: "flex",
               alignItems: "center",
               gap: "6px",
-              background: "rgba(255, 255, 255, 0.05)",
+              background: S.surfaceLight,
               border: `1px solid ${S.borderLight}`,
               padding: "6px 12px",
               borderRadius: "8px",
@@ -210,7 +210,7 @@ export default function ExploreDetailPage() {
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.borderColor = S.cyan;
-              (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+              (e.currentTarget as HTMLButtonElement).style.color = S.cyan;
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLButtonElement).style.borderColor = S.borderLight;
@@ -232,7 +232,7 @@ export default function ExploreDetailPage() {
 
           <ChevronRight size={14} style={{ opacity: 0.4 }} />
 
-          <span style={{ color: "#ffffff", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ color: S.textPrimary, maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {artwork.title || "Artwork Detail"}
           </span>
         </div>
@@ -317,7 +317,7 @@ export default function ExploreDetailPage() {
             position: "relative",
             borderRadius: "16px",
             overflow: "hidden",
-            background: "#08080c",
+            background: S.isDark ? "#08080c" : S.surfaceLight,
             border: `1px solid ${S.borderLight}`,
             display: "flex",
             alignItems: "center",
@@ -494,7 +494,7 @@ export default function ExploreDetailPage() {
             {/* Secret Formula DRM Box (Anti-Theft Protected) */}
             <div
               style={{
-                background: "#161622",
+                background: S.surfaceLight,
                 border: `1px solid ${S.borderLight}`,
                 borderRadius: "14px",
                 padding: "16px",
@@ -510,7 +510,7 @@ export default function ExploreDetailPage() {
                   Encrypted Master Recipe
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: "13.5px", color: "#e2e8f0", lineHeight: 1.6, fontFamily: "monospace" }}>
+              <p style={{ margin: 0, fontSize: "13.5px", color: S.textPrimary, lineHeight: 1.6, fontFamily: "monospace" }}>
                 {displayMasked}
               </p>
             </div>
@@ -673,7 +673,7 @@ export default function ExploreDetailPage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Sparkles size={18} style={{ color: S.cyan }} />
-              <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#ffffff", margin: 0 }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: S.textPrimary, margin: 0 }}>
                 Similar Generations
               </h2>
             </div>
@@ -715,7 +715,7 @@ export default function ExploreDetailPage() {
                 position: "relative",
                 borderRadius: "14px",
                 overflow: "hidden",
-                background: "#101018",
+                background: S.surface,
                 border: `1px solid ${S.borderLight}`,
                 cursor: "pointer",
                 aspectRatio: "1 / 1",

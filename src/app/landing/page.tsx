@@ -2,16 +2,7 @@
 
 import Link from "next/link";
 import { Sparkles, Play, ArrowRight, Zap, Shuffle, ShieldCheck, Globe } from "lucide-react";
-
-const S = {
-  bg: "#0d1117",
-  panelBorder: "#1e2533",
-  card: "#161d2b",
-  cardBorder: "#1e2b3a",
-  cyan: "#00d4ff",
-  textPrimary: "#e5e7eb",
-  textSecondary: "#6b7280",
-};
+import { useTheme } from "@/context/ThemeContext";
 
 const STATS = [
   { value: "100%", label: "Free — Forever" },
@@ -28,8 +19,10 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
+  const { colors: S } = useTheme();
+
   return (
-    <div style={{ minHeight: "100vh", background: S.bg }}>
+    <div style={{ minHeight: "100vh", background: S.background }}>
       <section style={{ position: "relative", overflow: "hidden" }}>
         <div style={{
           position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
@@ -95,7 +88,7 @@ export default function LandingPage() {
                 padding: "14px 28px", borderRadius: "10px",
                 background: "transparent", color: S.textPrimary,
                 fontSize: "15px", fontWeight: 600, textDecoration: "none",
-                border: `1px solid ${S.panelBorder}`,
+                border: `1px solid ${S.borderLight}`,
               }}
             >
               <Play size={15} />

@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, PanelLeftOpen, LogOut, Palette } from "lucide-react";
-import { useDrawer } from "@/context/DrawerContext";
+import { Bell, LogOut, Palette } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useTheme } from "@/context/ThemeContext";
 
 export default function TopBar() {
   const pathname = usePathname();
-  const { isOpen, toggleDrawer } = useDrawer();
   const { profile, signOut } = useUser();
   const { colors, preset, setPreset } = useTheme();
 
@@ -44,43 +42,12 @@ export default function TopBar() {
           gap: "16px",
         }}
       >
-        {/* Left section: Drawer toggle (when collapsed) & Page Title / Breadcrumb */}
+        {/* Left section: Page Title / Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {!isOpen && (
-            <button
-              id="topbar-drawer-toggle"
-              onClick={toggleDrawer}
-              title="Expand Sidebar"
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "transparent",
-                border: "1px solid #1e2533",
-                color: "#94a3b8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#00d4ff";
-                (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
-                (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
-              }}
-            >
-              <PanelLeftOpen size={16} />
-            </button>
-          )}
-
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span
               style={{
-                color: "#f1f5f9",
+                color: colors.textPrimary,
                 fontSize: "14px",
                 fontWeight: 600,
                 letterSpacing: "-0.01em",
@@ -112,9 +79,10 @@ export default function TopBar() {
                 outline: "none",
               }}
             >
-              <option value="defaultDark">Theme: Indigo (Default)</option>
-              <option value="cyberpunk">Theme: Cyberpunk</option>
-              <option value="obsidian">Theme: Obsidian</option>
+              <option value="obsidian">Theme: Deep Obsidian (Dark)</option>
+              <option value="aurora">Theme: Luminous Aurora (Light)</option>
+              <option value="defaultDark">Theme: Cosmic Indigo (Default)</option>
+              <option value="cyberpunk">Theme: Cyberpunk Neon</option>
             </select>
           </div>
 
@@ -125,21 +93,21 @@ export default function TopBar() {
               height: "34px",
               borderRadius: "8px",
               background: "transparent",
-              border: "1px solid #1e2533",
+              border: `1px solid ${colors.borderLight}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              color: "#6b7280",
+              color: colors.textMuted,
               transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#334155";
+              (e.currentTarget as HTMLButtonElement).style.color = colors.textPrimary;
+              (e.currentTarget as HTMLButtonElement).style.borderColor = colors.border;
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "#6b7280";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1e2533";
+              (e.currentTarget as HTMLButtonElement).style.color = colors.textMuted;
+              (e.currentTarget as HTMLButtonElement).style.borderColor = colors.borderLight;
             }}
           >
             <Bell size={15} />
@@ -175,7 +143,7 @@ export default function TopBar() {
             <span
               className="topbar-user-name"
               style={{
-                color: "#e2e8f0",
+                color: colors.textPrimary,
                 fontSize: "13px",
                 fontWeight: 500,
                 maxWidth: "140px",

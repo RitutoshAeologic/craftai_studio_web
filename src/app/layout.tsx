@@ -41,13 +41,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${inter.variable} ${outfit.variable} h-full`}
-      style={{ colorScheme: "dark" }}
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <body
-        className="min-h-full flex flex-col bg-[#0a0e18]"
-        style={{ fontFamily: "var(--font-inter, Inter, system-ui, sans-serif)", margin: 0, padding: 0 }}
+        className="min-h-full flex flex-col"
+        style={{
+          fontFamily: "var(--font-inter, Inter, system-ui, sans-serif)",
+          margin: 0,
+          padding: 0,
+          backgroundColor: "var(--bg-canvas, #0B0D14)",
+          color: "var(--text-primary, #F8FAFC)",
+        }}
         suppressHydrationWarning
       >
         <AppShell>{children}</AppShell>

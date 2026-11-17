@@ -41,6 +41,7 @@ import { MagicGrabTool } from "@/components/tools/MagicGrabTool";
 import { type ProductPackResponse } from "@/lib/api/toolsApi";
 import { saveGeneration } from "@/lib/supabase/db";
 import { theme } from "@/lib/theme/themeGuard";
+import { useTheme } from "@/context/ThemeContext";
 
 const S = theme.colors;
 
@@ -221,6 +222,7 @@ function OpticalLightingOverlay({
 
 function ToolsContent() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const searchParams = useSearchParams();
   const queryImage = searchParams.get("image");
   const queryAction = searchParams.get("action");
@@ -707,7 +709,7 @@ function ToolsContent() {
     <div
       style={{
         minHeight: "100%",
-        background: S.bg,
+        background: S.background,
         display: "flex",
         flexDirection: "column",
         padding: "clamp(16px, 4vw, 36px)",
@@ -776,7 +778,7 @@ function ToolsContent() {
           style={{
             display: "flex",
             gap: "8px",
-            borderBottom: `1px solid ${S.cardBorder}`,
+            borderBottom: `1px solid ${S.borderLight}`,
             paddingBottom: "12px",
             marginBottom: "24px",
             overflowX: "auto",
@@ -1211,7 +1213,7 @@ function ToolsContent() {
                 width: "100%",
                 borderRadius: "14px",
                 overflow: "hidden",
-                background: "#08080c",
+                background: S.isDark ? "#08080c" : S.surfaceLight,
                 aspectRatio: "1/1",
                 display: "flex",
                 alignItems: "center",
@@ -1519,7 +1521,7 @@ function ToolsContent() {
                 style={{
                   width: "100%",
                   marginTop: "16px",
-                  background: "#080c14",
+                  background: S.surfaceLight,
                   border: "1px solid rgba(244, 114, 182, 0.3)",
                   borderRadius: "14px",
                   padding: "16px",
@@ -1565,7 +1567,7 @@ function ToolsContent() {
                       key={idx}
                       onClick={() => { setToolOutput(item.url); setViewMode("result"); }}
                       style={{
-                        background: toolOutput === item.url ? "rgba(244, 114, 182, 0.15)" : "#0d131f",
+                        background: toolOutput === item.url ? "rgba(244, 114, 182, 0.15)" : S.surfaceLight,
                         border: toolOutput === item.url ? "2px solid #f472b6" : `1px solid ${S.borderLight}`,
                         borderRadius: "10px",
                         padding: "8px",
@@ -1577,11 +1579,11 @@ function ToolsContent() {
                       }}
                       title="Click to view in high-res on main stage"
                     >
-                      <div style={{ width: "100%", aspectRatio: "1/1", borderRadius: "6px", overflow: "hidden", background: "#000" }}>
+                      <div style={{ width: "100%", aspectRatio: "1/1", borderRadius: "6px", overflow: "hidden", background: S.isDark ? "#000" : S.surface }}>
                         <img src={item.url} alt={item.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#ffffff" }}>{item.label}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: S.textPrimary }}>{item.label}</span>
                         <span style={{ fontSize: "9px", color: S.textMuted }}>{item.ratio}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
@@ -1889,7 +1891,7 @@ function ToolsContent() {
                       placeholder="e.g. Modern concrete podium with soft morning sunlight and monstera leaves"
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "8px 10px",
@@ -1915,7 +1917,7 @@ function ToolsContent() {
                       onChange={(e) => setBgRatio(e.target.value)}
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "8px 10px",
@@ -2129,7 +2131,7 @@ function ToolsContent() {
                     placeholder="e.g. misty pine forest background, cinematic golden hour horizon"
                     style={{
                       width: "100%",
-                      background: "#080c14",
+                      background: S.surfaceLight,
                       border: `1px solid ${S.borderLight}`,
                       borderRadius: "8px",
                       padding: "10px",
@@ -2350,7 +2352,7 @@ function ToolsContent() {
                     placeholder="e.g. Obsidian Matte Minimalist Chrono Watch"
                     style={{
                       width: "100%",
-                      background: "#080c14",
+                      background: S.surfaceLight,
                       border: `1px solid ${S.borderLight}`,
                       borderRadius: "8px",
                       padding: "10px",
@@ -2373,7 +2375,7 @@ function ToolsContent() {
                       onChange={(e) => setProdRatio(e.target.value)}
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "8px 10px",
@@ -2398,7 +2400,7 @@ function ToolsContent() {
                       onChange={(e) => setProdLang(e.target.value)}
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "8px 10px",
@@ -2551,7 +2553,7 @@ function ToolsContent() {
                     placeholder="e.g. Summer Cold Brew Iced Coffee Launch"
                     style={{
                       width: "100%",
-                      background: "#080c14",
+                      background: S.surfaceLight,
                       border: `1px solid ${S.borderLight}`,
                       borderRadius: "8px",
                       padding: "10px",
@@ -2575,7 +2577,7 @@ function ToolsContent() {
                     placeholder="e.g. Cold. Bold. Refreshing."
                     style={{
                       width: "100%",
-                      background: "#080c14",
+                      background: S.surfaceLight,
                       border: `1px solid ${S.borderLight}`,
                       borderRadius: "8px",
                       padding: "10px",
@@ -2599,7 +2601,7 @@ function ToolsContent() {
                     placeholder="e.g. Single-origin cold brew • Available at all flagship stores"
                     style={{
                       width: "100%",
-                      background: "#080c14",
+                      background: S.surfaceLight,
                       border: `1px solid ${S.borderLight}`,
                       borderRadius: "8px",
                       padding: "10px",
@@ -2624,7 +2626,7 @@ function ToolsContent() {
                       placeholder="e.g. 50% OFF, BUY 1 GET 1"
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "10px",
@@ -2646,7 +2648,7 @@ function ToolsContent() {
                       onChange={(e) => setPosterTheme(e.target.value)}
                       style={{
                         width: "100%",
-                        background: "#080c14",
+                        background: S.surfaceLight,
                         border: `1px solid ${S.borderLight}`,
                         borderRadius: "8px",
                         padding: "10px",

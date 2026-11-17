@@ -22,15 +22,15 @@ export default function StudioError({
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0a0e18',
-      color: '#ffffff',
+      background: 'var(--bg-canvas, #0a0e18)',
+      color: 'var(--text-primary, #ffffff)',
       padding: '24px',
       textAlign: 'center',
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }}>
       <div style={{
-        background: '#161d2b',
-        border: '1px solid #1e293b',
+        background: 'var(--bg-surface, #161d2b)',
+        border: '1px solid var(--border-default, #1e293b)',
         borderRadius: '16px',
         padding: '36px',
         maxWidth: '480px',
@@ -50,7 +50,7 @@ export default function StudioError({
           <AlertCircle size={28} color="#ef4444" />
         </div>
         <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Studio Workspace Notice</h2>
-        <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+        <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
           {error?.message || 'An unexpected rendering issue occurred. Your progress is saved.'}
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>

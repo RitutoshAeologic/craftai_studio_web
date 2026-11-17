@@ -9,6 +9,44 @@ import { GenerationProvider } from "@/context/GenerationContext";
 import AppDrawer from "./AppDrawer";
 import TopBar from "./TopBar";
 import GlobalGenerationToast from "./GlobalGenerationToast";
+import BottomNavDock from "./BottomNavDock";
+
+import { useTheme } from "@/context/ThemeContext";
+
+function AppShellContent({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        background: colors.background,
+        color: colors.textPrimary,
+        transition: "background-color 0.2s ease, color 0.2s ease",
+      }}
+    >
+      {/* Leftmost Slim Icon Rail Sidebar */}
+      <AppDrawer />
+
+      {/* Right Main Content Area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, height: "100vh", overflow: "hidden" }}>
+        <TopBar />
+        <div style={{ flex: 1, overflowY: "auto", position: "relative", display: "flex", flexDirection: "column", background: colors.background }}>
+          {children}
+        </div>
+      </div>
+
+      {/* Floating Bottom Navigation Dock (MeiGen Style) */}
+      <BottomNavDock />
+
+      {/* Global Safeguard Generation Toast */}
+      <GlobalGenerationToast />
+    </div>
+  );
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,21 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <LLMConfigProvider>
           <DrawerProvider>
             <GenerationProvider>
-              <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", background: "var(--theme-background, #0b0b0f)" }}>
-                {/* Leftmost Collapsible Sidebar Drawer */}
-                <AppDrawer />
-
-                {/* Right Main Content Area */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, height: "100vh", overflow: "hidden" }}>
-                  <TopBar />
-                  <div style={{ flex: 1, overflowY: "auto", position: "relative", display: "flex", flexDirection: "column" }}>
-                    {children}
-                  </div>
-                </div>
-
-                {/* Global Safeguard Generation Toast */}
-                <GlobalGenerationToast />
-              </div>
+              <AppShellContent>{children}</AppShellContent>
             </GenerationProvider>
           </DrawerProvider>
         </LLMConfigProvider>

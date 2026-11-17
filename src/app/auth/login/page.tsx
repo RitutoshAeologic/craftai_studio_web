@@ -72,8 +72,8 @@ export default function LoginPage() {
       <div
         className="w-full max-w-[440px] rounded-2xl top-accent-border animate-fade-in-up"
         style={{
-          background: "#151d2f",
-          border: "1px solid #222f4c",
+          background: "var(--bg-surface, #151d2f)",
+          border: "1px solid var(--border-default, #222f4c)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,242,254,0.05)",
@@ -83,12 +83,12 @@ export default function LoginPage() {
         {/* Card Header */}
         <div className="text-center mb-6">
           <h1
-            className="text-2xl font-bold text-white mb-2"
-            style={{ fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
+            className="text-2xl font-bold mb-2"
+            style={{ color: "var(--text-primary, #ffffff)", fontFamily: "var(--font-outfit, Outfit, sans-serif)" }}
           >
             Welcome Back
           </h1>
-          <p className="text-sm" style={{ color: "#94a3b8" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary, #94a3b8)" }}>
             Sign in to your AI Creator Workspace
           </p>
         </div>

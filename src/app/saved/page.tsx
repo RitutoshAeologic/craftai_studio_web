@@ -18,12 +18,15 @@ import {
   type Generation,
 } from "@/lib/supabase/db";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 import { theme } from "@/lib/theme/themeGuard";
 
 const S = theme.colors;
 
 export default function SavedGalleryPage() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const S = colors;
   const { profile, user } = useUser();
   const userKey = user?.id || profile.email || "default";
 
@@ -112,7 +115,7 @@ export default function SavedGalleryPage() {
             style={{
               fontSize: "clamp(24px, 4vw, 36px)",
               fontWeight: 800,
-              color: "#ffffff",
+              color: S.textPrimary,
               letterSpacing: "-0.02em",
               margin: 0,
               fontFamily: "var(--font-outfit, Outfit, sans-serif)",
@@ -132,7 +135,7 @@ export default function SavedGalleryPage() {
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              background: "#12141f",
+              background: S.surfaceLight,
               border: `1px solid ${S.borderLight}`,
               borderRadius: "10px",
               padding: "8px 14px",
@@ -149,7 +152,7 @@ export default function SavedGalleryPage() {
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: "#f1f5f9",
+                color: S.textPrimary,
                 fontSize: "13px",
                 width: "100%",
               }}
@@ -171,7 +174,7 @@ export default function SavedGalleryPage() {
           style={{
             textAlign: "center",
             padding: "80px 20px",
-            background: "rgba(255, 255, 255, 0.02)",
+            background: S.surface,
             border: `1px dashed ${S.borderLight}`,
             borderRadius: "20px",
             maxWidth: "600px",
@@ -193,7 +196,7 @@ export default function SavedGalleryPage() {
           >
             <Bookmark size={28} />
           </div>
-          <h3 style={{ color: "#ffffff", fontSize: "20px", margin: "0 0 8px", fontWeight: 700 }}>
+          <h3 style={{ color: S.textPrimary, fontSize: "20px", margin: "0 0 8px", fontWeight: 700 }}>
             No saved creations yet
           </h3>
           <p style={{ fontSize: "13.5px", color: S.textSecondary, lineHeight: 1.5, margin: "0 0 24px" }}>
@@ -239,10 +242,10 @@ export default function SavedGalleryPage() {
                 position: "relative",
                 borderRadius: "16px",
                 overflow: "hidden",
-                background: "#08080c",
+                background: S.surface,
                 border: `1px solid ${S.borderLight}`,
                 aspectRatio: "1 / 1",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                boxShadow: S.isDark ? "0 8px 24px rgba(0, 0, 0, 0.4)" : "0 8px 24px rgba(15, 23, 42, 0.08)",
                 transition: "transform 0.2s, border-color 0.2s, box-shadow 0.2s",
                 display: "flex",
                 alignItems: "center",

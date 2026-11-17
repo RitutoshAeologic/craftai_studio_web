@@ -38,11 +38,11 @@ import { useUser } from "@/context/UserContext";
 import { theme } from "@/lib/theme/themeGuard";
 import { ImageLightboxModal } from "@/components/ui/ImageLightboxModal";
 import { DeleteConfirmationModal } from "@/components/ui/DeleteConfirmationModal";
-
-const S = theme.colors;
+import { useTheme } from "@/context/ThemeContext";
 
 export default function JobDetailPage() {
   const router = useRouter();
+  const { colors: S } = useTheme();
   const params = useParams();
   const jobId = params?.jobId as string;
   const { profile, user } = useUser();
@@ -201,16 +201,16 @@ export default function JobDetailPage() {
   }
 
   return (
-    <div style={{ minHeight: "100%", background: S.bg, display: "flex", flexDirection: "column", position: "relative" }}>
+    <div style={{ minHeight: "100%", background: S.background, display: "flex", flexDirection: "column", position: "relative" }}>
       {/* ── Top Navigation Bar ───────────────────────────────── */}
       <div
         style={{
           padding: "12px 20px",
-          borderBottom: `1px solid ${S.cardBorder}`,
+          borderBottom: `1px solid ${S.borderLight}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "rgba(11, 11, 15, 0.9)",
+          background: S.isDark ? "rgba(11, 13, 20, 0.9)" : "rgba(255, 255, 255, 0.92)",
           backdropFilter: "blur(14px)",
           position: "sticky",
           top: 0,
@@ -230,7 +230,7 @@ export default function JobDetailPage() {
             fontWeight: 600,
             cursor: "pointer",
           }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#fff")}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = S.textPrimary)}
           onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = S.textSecondary)}
         >
           <ArrowLeft size={16} />
@@ -309,9 +309,9 @@ export default function JobDetailPage() {
             width: "100%",
             borderRadius: "18px",
             overflow: "hidden",
-            background: "#08080c",
-            border: `1px solid ${S.cardBorder}`,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+            background: S.isDark ? "#08080c" : S.surfaceLight,
+            border: `1px solid ${S.borderLight}`,
+            boxShadow: S.isDark ? "0 20px 60px rgba(0,0,0,0.8)" : "0 20px 60px rgba(15,23,42,0.12)",
             marginBottom: "16px",
             cursor: "zoom-in",
           }}
@@ -380,7 +380,7 @@ export default function JobDetailPage() {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "8px 0 16px",
-            borderBottom: `1px solid ${S.cardBorder}`,
+            borderBottom: `1px solid ${S.borderLight}`,
             marginBottom: "16px",
           }}
         >
@@ -482,8 +482,8 @@ export default function JobDetailPage() {
         <div
           style={{
             width: "100%",
-            background: S.card,
-            border: `1px solid ${S.cardBorder}`,
+            background: S.surface,
+            border: `1px solid ${S.borderLight}`,
             borderRadius: "12px",
             padding: "16px",
             boxSizing: "border-box",
@@ -496,7 +496,7 @@ export default function JobDetailPage() {
             style={{
               margin: 0,
               fontSize: "13px",
-              color: "#e2e8f0",
+              color: S.textPrimary,
               lineHeight: 1.6,
               display: showFullPrompt ? "block" : "-webkit-box",
               WebkitLineClamp: showFullPrompt ? "unset" : 3,
@@ -829,7 +829,7 @@ export default function JobDetailPage() {
                 lineHeight: 1.5,
               }}
             >
-              <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#ffffff" }}>
+              <p style={{ margin: "0 0 6px", fontWeight: 700, color: S.textPrimary }}>
                 ✨ 2 Credits ($0.20) Master Export Fee
               </p>
               Unlock lossless 4K resolution master render. Once unlocked, all future re-downloads of this masterpiece are <strong>100% Free &amp; Idempotent</strong> forever.
@@ -975,9 +975,9 @@ export default function JobDetailPage() {
                   width: "100%",
                   padding: "10px 12px",
                   borderRadius: "10px",
-                  background: "rgba(255, 255, 255, 0.05)",
+                  background: S.surfaceLight,
                   border: `1px solid ${S.borderLight}`,
-                  color: "#ffffff",
+                  color: S.textPrimary,
                   fontSize: "13px",
                   outline: "none",
                   boxSizing: "border-box",
@@ -997,9 +997,9 @@ export default function JobDetailPage() {
                   width: "100%",
                   padding: "10px 12px",
                   borderRadius: "10px",
-                  background: "#161b26",
+                  background: S.surfaceLight,
                   border: `1px solid ${S.borderLight}`,
-                  color: "#ffffff",
+                  color: S.textPrimary,
                   fontSize: "13px",
                   outline: "none",
                   cursor: "pointer",
@@ -1009,7 +1009,7 @@ export default function JobDetailPage() {
                 {categoriesList
                   .filter((c) => c.slug !== "all")
                   .map((c) => (
-                    <option key={c.id} value={c.name} style={{ background: "#161b26", color: "#fff" }}>
+                    <option key={c.id} value={c.name} style={{ background: S.surface, color: S.textPrimary }}>
                       {c.name} — {c.description || "Style category"}
                     </option>
                   ))}
@@ -1028,7 +1028,7 @@ export default function JobDetailPage() {
                 lineHeight: 1.5,
               }}
             >
-              <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#ffffff" }}>
+              <p style={{ margin: "0 0 4px", fontWeight: 700, color: S.textPrimary }}>
                 💰 40% Creator Royalty Split Active
               </p>
               When other community creators remix your artwork formula in the Studio, you earn <strong>1.60 Credits ($0.16)</strong> royalty payout directly to your wallet.

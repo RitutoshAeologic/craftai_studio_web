@@ -26,6 +26,7 @@ import {
 } from "@/lib/supabase/db";
 import { useRazorpayCheckout } from "@/lib/hooks/useRazorpayCheckout";
 import { useUser } from "@/context/UserContext";
+import { useTheme } from "@/context/ThemeContext";
 import { theme } from "@/lib/theme/themeGuard";
 
 const S = theme.colors;
@@ -45,6 +46,7 @@ function formatLedgerDate(isoStr: string) {
 
 export default function WalletPage() {
   const { profile, user } = useUser();
+  const { colors: S } = useTheme();
   const userKey = user?.id || profile.email || "default";
 
   const [wallet, setWallet] = useState<Wallet>({
@@ -106,7 +108,7 @@ export default function WalletPage() {
   };
 
   return (
-    <div style={{ minHeight: "100%", background: S.bg, display: "flex", flexDirection: "column", padding: "clamp(16px, 4vw, 36px)" }}>
+    <div style={{ minHeight: "100%", background: S.background, display: "flex", flexDirection: "column", padding: "clamp(16px, 4vw, 36px)" }}>
       {/* ── Page Header ──────────────────────────────────────── */}
       <div style={{ maxWidth: "1000px", margin: "0 auto", width: "100%" }}>
         <div style={{ marginBottom: "24px" }}>
@@ -122,11 +124,13 @@ export default function WalletPage() {
         {/* ── Balance Card with Dual Breakdown (Purchased vs Earned Royalty) ── */}
         <div
           style={{
-            background: "linear-gradient(135deg, #121218 0%, #1e1e2e 100%)",
+            background: S.isDark
+              ? "linear-gradient(135deg, #121218 0%, #1e1e2e 100%)"
+              : "linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)",
             border: `1px solid ${S.borderLight}`,
             borderRadius: "18px",
             padding: "24px clamp(16px, 3vw, 28px)",
-            boxShadow: "0 12px 36px rgba(0,0,0,0.6)",
+            boxShadow: S.isDark ? "0 12px 36px rgba(0,0,0,0.6)" : "0 12px 32px rgba(15, 23, 42, 0.08)",
             marginBottom: "32px",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -151,9 +155,9 @@ export default function WalletPage() {
           <div
             style={{
               padding: "12px 16px",
-              background: "rgba(255,255,255,0.03)",
+              background: S.isDark ? "rgba(255,255,255,0.03)" : S.surfaceLight,
               borderRadius: "12px",
-              border: `1px solid ${S.cardBorder}`,
+              border: `1px solid ${S.borderLight}`,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "6px", color: S.primary, fontSize: "12px", fontWeight: 600 }}>
